@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🧳キャリーケースシミュレーター</title>
+    <style>
+        :root { --panel-width: 300px; }
+        body { margin: 0; font-family: 'Helvetica Neue', Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; background: #ffffff; overflow: hidden; }
+        #ui-panel {
+            position: absolute; top: 10px; left: 10px; width: var(--panel-width);
+            max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px);
+            background: rgba(255, 255, 255, 0.95); padding: 15px; padding-bottom: 40px;
+            border-radius: 15px; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+            border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            box-sizing: border-box; transition: all 0.2s ease-out;
+        }
+        #canvas-container { width: 100vw; height: 100vh; cursor: move; touch-action: none; }
+        @media screen and (max-width: 480px) {
+            :root { --panel-width: calc(100vw - 20px); }
+            #ui-panel { left: 10px; right: 10px; }
+        }
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            :root { --panel-width: 260px; }
+            #ui-panel { top: 5px; left: 5px; padding: 10px; max-height: calc(100vh - 10px); }
+            .app-title { font-size: 1.1rem; }
+            .input-group { padding: 8px; margin-bottom: 5px; }
+        }
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; gap: 10px;
+            position: sticky; top: -15px; background: rgba(255, 255, 255, 0.95);
+            padding: 10px 0; margin: -15px -15px 10px -15px; padding-left: 15px; padding-right: 15px;
+            z-index: 10; border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        #toggle-text { font-size: 12px; font-weight: bold; color: #666; background: #eee; padding: 4px 10px; border-radius: 10px; white-space: nowrap; }
+        .collapsed #ui-content { display: none; }
+        .app-title { font-size: 1.2rem; margin: 0; color: #333; font-weight: bold; white-space: nowrap; }
+        .app-description { font-size: 11px; color: #777; margin-top: 8px; margin-bottom: 5px; line-height: 1.5; text-align: center; }
+        .input-group { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; margin-bottom: 10px; }
+        .group-a { background: #fff5f0; border: 1px solid #ffe0d0; }
+        .group-b { background: #f0f7ff; border: 1px solid #d0e7ff; }
+        .group-s { background: #f5f5f5; border: 1px solid #e0e0e0; }
+        .group-layout { background: #f9f9f9; border: 1px solid #eee; }
+        .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+        .section-header strong { font-size: 15px; color: #444; }
+        .input-row { display: flex; gap: 8px; align-items: flex-end; width: 100%; }
+        .input-item { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .hint { font-size: 10px; color: #999; margin-bottom: 2px; font-weight: bold; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; background: white; color: #333; width: 100%; box-sizing: border-box; }
+        .radio-switch { display:flex; gap:4px; background:#eee; padding:3px; border-radius:8px; margin-top:2px }
+        .radio-switch label { flex:1; text-align:center; font-size:11px; font-weight:bold; padding:6px 0; border-radius:6px; cursor:pointer; color:#666; transition:.2s; user-select:none }
+        .radio-switch input { display:none }
+        .radio-switch input:checked + label { background:#fff; color:#333; box-shadow:0 2px 4px rgba(0,0,0,.1) }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+        .color-picker { width: 100%; height: 38px; border: 2px solid #999; border-radius: 4px; cursor: pointer; padding: 0; background: none; appearance: none; -webkit-appearance: none; }
+        .switch-btn { width: 100%; padding: 12px; background: #333; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; -webkit-tap-highlight-color: transparent; margin-bottom: 10px; }
+        .switch-btn:active { background: #000; transform: scale(0.98); }
+        .swap-btn { margin-bottom: 5px; }
+        .share-btn { width: 100%; padding: 12px; background: #000; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-top: 10px; }
+        .share-btn:active { transform: scale(0.98); opacity: 0.8; }
+        .other-tools-link { margin-top: 20px; padding: 10px; background: #f9f9f9; border-radius: 10px; text-align: center; }
+        .other-tools-link a { text-decoration: none; color: #333; font-size: 12px; font-weight: bold; border: 2px solid #333; padding: 8px 15px; border-radius: 30px; display: inline-block; transition: 0.3s; margin: 4px; }
+        .other-tools-link a:hover { background: #333; color: #fff; }
+        .usage-notes { font-size: 10px; color: #999; margin-top: 12px; line-height: 1.5; text-align: center; }
+        .group-note { font-size: 10px; color: #999; margin-top: 6px; line-height: 1.5; }
+        .info-box { background: #ffffff; padding: 15px; border-radius: 12px; margin-top: 12px; border: 1px solid #eee; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+        .info-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; }
+        .info-row:not(:last-child) { border-bottom: 1px dashed #eee; margin-bottom: 4px; }
+        .info-label { color: #555; font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        .info-value { font-weight: 800; font-size: 18px; color: #2c3e50; font-variant-numeric: tabular-nums; }
+        .unit { font-size: 11px; margin-left: 3px; color: #7f8c8d; font-weight: normal; }
+        .info-desc { font-size: 12px; color: #444; line-height: 1.6; padding: 6px 0; }
+        #view-label { position: absolute; bottom: 20px; right: 15px; background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; z-index: 90; pointer-events: none; }
+        .crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid rgba(0,0,0,0.15); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        #ui-panel.collapsed { max-height: none !important; padding: 10px 15px !important; overflow: hidden !important; width: auto; max-width: calc(100vw - 20px); }
+        @media screen and (max-width: 480px) { #ui-panel.collapsed { right: auto; } }
+    </style>
+</head>
+<body>
+
+<div id="ui-panel">
+    <div class="panel-header" onclick="togglePanel()">
+        <h1 class="app-title">🧳キャリーケース<br>シミュレーター</h1>
+        <span id="toggle-text">閉じる</span>
+    </div>
+
+    <div id="ui-content">
+        <p class="app-description">キャリーケースと体格差をシミュレートします。</p>
+
+        <div class="input-group group-a">
+            <div class="section-header"><strong>A</strong></div>
+            <div class="input-row">
+                <div class="input-item"><span class="hint">名前</span><input type="text" id="nameA" placeholder="名前A" oninput="updateScene()"></div>
+                <div class="input-item" style="flex: 0.6;"><span class="hint">性別</span><select id="genderA" onchange="updateScene()"><option value="male">男</option><option value="female" selected>女</option></select></div>
+            </div>
+            <div class="input-row">
+                <div class="input-item"><span class="hint">身長 (cm)</span><input type="number" id="heightA" value="158.0" step="0.1" oninput="updateScene()"></div>
+                <div class="input-item" style="flex: 0.35;"><span class="hint">色</span><input type="color" id="colorA" class="color-picker" value="#ffcc99" oninput="updateScene()"></div>
+            </div>
+        </div>
+
+        <div class="input-group group-b" id="panel-group-b">
+            <div class="section-header"><strong>B</strong></div>
+            <div class="input-row">
+                <div class="input-item"><span class="hint">名前</span><input type="text" id="nameB" placeholder="名前B" oninput="updateScene()"></div>
+                <div class="input-item" style="flex: 0.6;"><span class="hint">性別</span><select id="genderB" onchange="updateScene()"><option value="male" selected>男</option><option value="female">女</option></select></div>
+            </div>
+            <div class="input-row">
+                <div class="input-item"><span class="hint">身長 (cm)</span><input type="number" id="heightB" value="171.5" step="0.1" oninput="updateScene()"></div>
+                <div class="input-item" style="flex: 0.35;"><span class="hint">色</span><input type="color" id="colorB" class="color-picker" value="#ffad60" oninput="updateScene()"></div>
+            </div>
+        </div>
+
+        <div class="input-group group-s">
+            <div class="section-header"><strong>スーツケースの設定</strong></div>
+            <div class="input-item"><span class="hint">Aのスーツケースの色</span><input type="color" id="colorCaseA" class="color-picker" value="#d14d6e" oninput="updateScene()"></div>
+            <div class="input-item">
+                <span class="hint">Aの大きさ</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-sizeA-fit" name="sizeA" value="fit" checked onchange="setSizeA('fit')"><label for="radio-sizeA-fit">身の丈</label>
+                    <input type="radio" id="radio-sizeA-s" name="sizeA" value="S" onchange="setSizeA('S')"><label for="radio-sizeA-s">S</label>
+                    <input type="radio" id="radio-sizeA-m" name="sizeA" value="M" onchange="setSizeA('M')"><label for="radio-sizeA-m">M</label>
+                    <input type="radio" id="radio-sizeA-l" name="sizeA" value="L" onchange="setSizeA('L')"><label for="radio-sizeA-l">L</label>
+                </div>
+            </div>
+            <div class="input-item"><span class="hint">Bのスーツケースの色</span><input type="color" id="colorCaseB" class="color-picker" value="#3a5a78" oninput="updateScene()"></div>
+            <div class="input-item">
+                <span class="hint">Bの大きさ</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-sizeB-fit" name="sizeB" value="fit" checked onchange="setSizeB('fit')"><label for="radio-sizeB-fit">身の丈</label>
+                    <input type="radio" id="radio-sizeB-s" name="sizeB" value="S" onchange="setSizeB('S')"><label for="radio-sizeB-s">S</label>
+                    <input type="radio" id="radio-sizeB-m" name="sizeB" value="M" onchange="setSizeB('M')"><label for="radio-sizeB-m">M</label>
+                    <input type="radio" id="radio-sizeB-l" name="sizeB" value="L" onchange="setSizeB('L')"><label for="radio-sizeB-l">L</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-group" style="background: #f8f8f8; border: 1px solid #eee;">
+            <div class="section-header"><strong>アニメーション</strong></div>
+            <div class="radio-switch">
+                <input type="radio" id="radio-anim-none" name="anim" value="none" checked onchange="setAnimMode('none')"><label for="radio-anim-none">停止</label>
+                <input type="radio" id="radio-anim-play" name="anim" value="play" onchange="setAnimMode('play')"><label for="radio-anim-play">アニメーション</label>
+            </div>
+            <div class="group-note">※アニメーションは設定タブを閉じると始まります</div>
+        </div>
+
+        <div class="input-group group-layout" style="gap:5px">
+            <div class="section-header"><strong>シチュエーション</strong></div>
+            <div class="input-item">
+                <span class="hint">モード</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-mode-stairs" name="mode" value="stairs" checked onchange="setMode('stairs')"><label for="radio-mode-stairs">階段で持つ</label>
+                    <input type="radio" id="radio-mode-pull" name="mode" value="pull" onchange="setMode('pull')"><label for="radio-mode-pull">引いて歩く</label>
+                </div>
+            </div>
+            <div class="input-item" id="item-pullpos" style="transition: opacity 0.3s; opacity: 0.3; pointer-events: none;">
+                <span class="hint">引く位置</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-pullpos-back" name="pullpos" value="back" checked onchange="setPullPos('back')"><label for="radio-pullpos-back">後ろに引く</label>
+                    <input type="radio" id="radio-pullpos-side" name="pullpos" value="side" onchange="setPullPos('side')"><label for="radio-pullpos-side">横につける</label>
+                </div>
+            </div>
+            <div class="input-item">
+                <span class="hint">持ち方</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-pat-one" name="pattern" value="one" checked onchange="setPattern('one')"><label for="radio-pat-one" id="lbl-pat-one">片方が持つ</label>
+                    <input type="radio" id="radio-pat-each" name="pattern" value="each" onchange="setPattern('each')"><label for="radio-pat-each" id="lbl-pat-each">それぞれが持つ</label>
+                </div>
+            </div>
+            <div class="input-item" id="item-carrier" style="transition: opacity 0.3s;">
+                <span class="hint">持つ人</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-carrier-a" name="carrier" value="A" onchange="setCarrier('A')"><label for="radio-carrier-a" id="lbl-carrier-a">Aが持つ</label>
+                    <input type="radio" id="radio-carrier-b" name="carrier" value="B" checked onchange="setCarrier('B')"><label for="radio-carrier-b" id="lbl-carrier-b">Bが持つ</label>
+                </div>
+            </div>
+            <div class="input-item" id="item-dir" style="transition: opacity 0.3s;">
+                <span class="hint">方向</span>
+                <div class="radio-switch">
+                    <input type="radio" id="radio-dir-up" name="dir" value="up" checked onchange="setDir('up')"><label for="radio-dir-up">上り</label>
+                    <input type="radio" id="radio-dir-down" name="dir" value="down" onchange="setDir('down')"><label for="radio-dir-down">下り</label>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 0 5px;">
+            <button class="switch-btn swap-btn" id="btn-swap" onclick="swapAB()">⇄ AとBを入れ替える</button>
+            <button class="switch-btn" onclick="switchView()">🔄 視点を切り替える</button>
+        </div>
+
+        <div id="info-container">
+            <div class="info-box" id="info"></div>
+            <button class="share-btn" onclick="shareToX()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>で結果をシェアする
+            </button>
+            <div class="other-tools-link">
+                <p style="font-size: 10px; color: #888; margin-bottom: 8px;">こちらもチェック❣🤩</p>
+                <a href="https://qwertyaz111.github.io/my-site-hub/">ツール・シミュレーター一覧</a>
+            </div>
+            <div class="usage-notes">
+                スクショ投稿や加工、トレース等はご自由にお楽しみください。<br>
+                ※営利目的や商用利用はご遠慮ください。
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="view-label"></div>
+<div class="crosshair" id="crosshair" style="display:none;"></div>
+<div id="canvas-container"></div>
+
+<script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+
+    let scene, camera, renderer;
+    let personA, personB, envGroup, caseGroup, stageGroup;
+    let caseAObj = null, caseBObj = null;
+    let currentView = '3rd';
+    let rotation = { x: 0.06, y: Math.PI / 2 - 0.15 }, camDist = 3.4, isDragging = false, previousTouch = null;
+    let viewCenter = new THREE.Vector3(0.15, 1.05, 1.15);
+    const measure = {};
+    const WHEEL_DROP = 0.035; // ケース中心から車輪底までの H/2 以外の落差
+    const CLR_TGT = 0.025; // 階段でケース底が段面から確保する目標クリアランス（m）。2.5cm: ユーザー指示「現実ではもう少し持ち上げる」で 1.5cm から引き上げ（2026-11-20）。3.0cm では下り flight2 で担当者の肘が 110.1° と上限（110°）を超えたため 2.5cm に決定。肘中央値は arm1 46°／arm0 71°（抱え上げと指摘された 110° とは大きく離れている）
+    const CLR_EXTRA = 0.020; // 浮きの底上げ（2026-11-20 追加: ユーザー「現実は4〜5cm浮いている場面が多い」。同日さらに「もう少し高く持ち上げられる？」で 1.5→2.0cm へ引き上げ、目標合計は CLR_TGT と合わせて 4.0→4.5cm）。最小保証は CLR_TGT=2.5cm のまま、liftCorr の目標にだけ上乗せし、拘束局面の典型浮きを引き上げる。実測（デフォルト構成・実段面基準）: 拘束局面の p10 が上り 4.04→4.54cm／下り 3.98→4.48cm、フライト最小浮き 2.98→3.48cm、全構成スイープ最小 2.91→3.41cm、手誤差 0.00mm。律速は下り arm1（caseA側）の肘最大で 106.8→107.6°（1/240 細サンプル 107.8°）——「抱え上げ」と指摘された 110° まで 2.2° の余裕を残す。合計 5.0cm では 108.5°（余裕 1.5°）、5.5cm では 109.3° まで迫るため不採用。なお下り arm1 は引き上げ前でも 106.9° あり、下りの幾何が律速（上りは最大でも arm0 96.4°）。肘中央値は上り 67°／46°・下り 52°／81°。CLR_TGT 自体を上げる案は 3.0cm で肘 110.1° 超えの前例があるため採らず、上乗せ分は carryLift 等で既に足りている局面では liftCorr が残差化して二重に効かない。沈みの床クランプ（1.05cm）は底上げ後も全構成スイープで合格ライン +1.0cm を維持することを再確認済み
+    const ANKLE_Y = 0.055;
+
+    /* ================= アニメーション / 駅階段プロファイル ================= */
+    let gridHelper = null;
+    let animTime = 0, animPlaying = false; // デフォルトは停止（初期ポーズは t=0 の地面）
+    const animClock = new THREE.Clock();
+    let layout = null;
+    let lastFeet = null; // 直近の applyStairs の足首目標（検証用）
+    const STAIR_H = 0.16, STAIR_D = 0.32, STAIR_STEPS = 15;
+    const LAND_D = STAIR_D * 4, STAIR_W = 4.0;
+    const FLIGHT1_Z0 = 0, LAND_Z0 = STAIR_STEPS * STAIR_D, FLIGHT2_Z0 = LAND_Z0 + LAND_D;
+    const TOP_Z0 = FLIGHT2_Z0 + STAIR_STEPS * STAIR_D, TOP_H = STAIR_H * STAIR_STEPS * 2;
+    /* 水平位置 z → その真下の段面（床面）の高さ */
+    function heightAt(z) {
+        if (z < FLIGHT1_Z0) return 0;
+        if (z < LAND_Z0) return (Math.floor((z - FLIGHT1_Z0) / STAIR_D) + 1) * STAIR_H;
+        if (z < FLIGHT2_Z0) return STAIR_H * STAIR_STEPS;
+        if (z < TOP_Z0) return STAIR_H * STAIR_STEPS + (Math.floor((z - FLIGHT2_Z0) / STAIR_D) + 1) * STAIR_H;
+        return TOP_H;
+    }
+    /* 段鼻の手前0.12mから次の段面へ smoothstep でつないだ段面（zに対して連続。足・ケースの先読み用） */
+    function rampHeightAt(z) {
+        const h0 = heightAt(z);
+        if (heightAt(z + 0.12) <= h0) return h0;
+        let lo = 0, hi = 0.12;
+        for (let it = 0; it < 10; it++) { const mid = (lo + hi) / 2; if (heightAt(z + mid) > h0) hi = mid; else lo = mid; } // 10回で分解能0.3mm（6回=4.7mmではランプ目標が階段状になりケース高さが小刻みに跳ぶ）
+        const u = Math.max(0, 1 - hi / 0.12);
+        return h0 + (heightAt(z + 0.12) - h0) * (u * u * (3 - 2 * u));
+    }
+    /* 段ごとの微妙な個体差（決定的ハッシュ: 同じ段はいつも同じ値。単調な繰り返しを崩すため） */
+    function stepVary(n) { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); }
+    const CYCLE_T = 35;
+    let tactStepBands = [], tactLandBands = []; // 黄色い帯の中心z（検証用）
+    /* [時刻s, z位置m] のキーフレーム。Bは両手に合計32kg相当を持つので遅め、Aは後ろから追う */
+    const SCHED_B = [[0, -1.7], [1.62, 0], [15.12, 4.8], [16.72, 6.08], [30.22, 10.88], [31.84, 12.5], [CYCLE_T, 12.5]];
+    const SCHED_A = [[0, -3.4], [3.9, -0.291], [18.7, 5.091], [19.35, 5.789], [34.15, 11.171], [34.5, 11.45], [CYCLE_T, 11.45]]; // 交互足（参考版の区間構成）: フライトは入口0.8s＋15段×0.88s＋出口0.8s＝14.8s、体の進みは1段0.32m/0.88s。フライト入口は段の手前0.291m、出口は踊り場・上の階へ0.291m進んだ位置。差分（参考版37秒→35秒）はアプローチ／踊り場／上の階で吸収。アプローチは担当者との間隔（ケースへの接近回避）のため少し長め
+    function schedZ(sched, t) {
+        if (t <= sched[0][0]) return sched[0][1];
+        for (let i = 0; i < sched.length - 1; i++) {
+            const [t0, z0] = sched[i], [t1, z1] = sched[i + 1];
+            if (t <= t1) return z0 + (z1 - z0) * ((t - t0) / Math.max(t1 - t0, 1e-9));
+        }
+        return sched[sched.length - 1][1];
+    }
+    function schedSeg(sched, t) {
+        for (let i = 0; i < sched.length - 1; i++) { if (t < sched[i + 1][0]) return i; }
+        return sched.length - 2;
+    }
+    function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+    function smooth01(x) { x = clamp01(x); return x * x * (3 - 2 * x); }
+    /* 補正付き平滑 max（a=b でバイアス0、微分連続、真の max からのはみ出しは最大でも ~0.02k）。素の max の切替キンクを消す用 */
+    function smaxC(a, b, k) { const s = (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2; const dq = (a - b) / k; return s - (k / 2) * Math.exp(-dq * dq); }
+    /* 歩行1周期ぶんの片脚プロファイル: 支持期60% / スイング期40%。
+       u=位相[0,1)、amp=前後振幅(m)。スイングは離地を速く・着地前に減速するイージング、支持は等速で後方へ */
+    const GAIT_SWING = 0.4;
+    function gaitLeg(u, amp) {
+        u = ((u % 1) + 1) % 1;
+        if (u < GAIT_SWING) {
+            const s = u / GAIT_SWING;
+            const e = 1 - Math.pow(1 - s, 2.2);
+            return { z: -amp + 2 * amp * e, lift: Math.sin(s * Math.PI) };
+        }
+        const s = (u - GAIT_SWING) / (1 - GAIT_SWING);
+        return { z: amp - 2 * amp * s, lift: 0 };
+    }
+
+    /* ================= ケースのサイズ規則（前回版から継承） ================= */
+    function fitCase(heightCm){
+        if (heightCm < 150) return { h:54, vol:36, kg:12 };
+        if (heightCm < 160) return { h:60, vol:48, kg:14 };
+        if (heightCm < 170) return { h:66, vol:62, kg:16 };
+        if (heightCm < 180) return { h:72, vol:78, kg:18 };
+        return { h:76, vol:90, kg:20 };
+    }
+    function caseFor(heightCm, sizeType){
+        if (sizeType === 'S') return { h:54, vol:36, kg:12 };
+        if (sizeType === 'M') return { h:66, vol:62, kg:16 };
+        if (sizeType === 'L') return { h:80, vol:100, kg:22 };
+        return fitCase(heightCm);
+    }
+    function caseDims(spec){
+        const H = spec.h / 100;
+        return { H: H, W: H * 0.66, D: H * 0.42 };
+    }
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 1000);
+        camera.rotation.order = 'YXZ';
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 2.5));
+        gridHelper = new THREE.GridHelper(200, 400, 0xeeeeee, 0xf5f5f5);
+        scene.add(gridHelper);
+
+        stageGroup = new THREE.Group();
+        scene.add(stageGroup);
+        envGroup = new THREE.Group();
+        stageGroup.add(envGroup);
+        caseGroup = new THREE.Group();
+        stageGroup.add(caseGroup);
+
+        setupControls();
+        window.addEventListener('resize', onWindowResize);
+
+        window.updateScene = updateScene;
+        window.setMode = setMode;
+        window.setSizeA = setSizeA;
+        window.setSizeB = setSizeB;
+        window.switchView = switchView;
+        window.swapAB = swapAB;
+        window.shareToX = shareToX;
+        window.setAnimMode = setAnimMode;
+        window.setDir = setDir;
+        window.setHold = setHold;
+        window.setPattern = setPattern;
+        window.setCarrier = setCarrier;
+        window.setPullPos = setPullPos;
+        window.togglePanel = () => {
+            const panel = document.getElementById('ui-panel');
+            const text = document.getElementById('toggle-text');
+            panel.classList.toggle('collapsed');
+            const collapsed = panel.classList.contains('collapsed');
+            text.innerText = collapsed ? '開く' : '閉じる';
+            if (collapsed) { // 予約方式（お座りのピアノ連弾と同じ）: 閉じた時点でラジオが「アニメーション」なら約1秒後に開始。「停止」なら閉じても始まらない。開く操作では再生状態を変えない
+                setTimeout(() => {
+                    if (panel.classList.contains('collapsed') && radioVal('anim', 'none') === 'play' && !animPlaying) { animPlaying = true; animClock.getDelta(); }
+                }, 1000);
+            }
+        };
+        window.__sim = {
+            get A(){ return personA; }, get B(){ return personB; },
+            get caseA(){ return caseAObj; }, get caseB(){ return caseBObj; },
+            get camera(){ return camera; }, get rotation(){ return rotation; },
+            get view(){ return currentView; }, measure: measure,
+            setAnimTime(sec) { animTime = sec; applyPose(sec); },
+            getAnimTime() { return animTime; },
+            isPlaying() { return animPlaying; },
+            heightAt: heightAt, cycleT: CYCLE_T,
+            get env() { return envGroup; },
+            get tactStepBands() { return tactStepBands; },
+            get tactLandBands() { return tactLandBands; }
+        };
+
+        document.querySelectorAll('#ui-panel input, #ui-panel select').forEach(element => {
+            element.addEventListener('blur', () => {
+                const panel = document.getElementById('ui-panel');
+                if (panel) panel.scrollTop = 0;
+                window.scrollTo(0, 0);
+            });
+        });
+
+        updateScene();
+        animate();
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function radioVal(name, fallback) {
+        const list = document.querySelectorAll('input[name="' + name + '"]');
+        for (const el of list) if (el.checked) return el.value;
+        return fallback;
+    }
+    function checkRadio(name, value) {
+        document.querySelectorAll('input[name="' + name + '"]').forEach(el => { el.checked = el.value === value; });
+    }
+    function setMode(mode) {
+        checkRadio('mode', mode);
+        const stairs = mode === 'stairs';
+        const dEl = document.getElementById('item-dir'); // 方向は隠さずグレーアウト（🔞系の無効化デザイン）
+        if (dEl) { dEl.style.display = ''; dEl.style.opacity = stairs ? '1' : '0.3'; dEl.style.pointerEvents = stairs ? 'auto' : 'none'; }
+        const pEl = document.getElementById('item-pullpos'); // 引く位置も隠さずグレーアウト（階段では選択不可、引いて歩くで復帰）
+        if (pEl) { pEl.style.display = ''; pEl.style.opacity = stairs ? '0.3' : '1'; pEl.style.pointerEvents = stairs ? 'none' : 'auto'; }
+        const w = stairs ? '持つ' : '引く';
+        const l1 = document.getElementById('lbl-pat-one'); if (l1) l1.textContent = '片方が' + w;
+        const l2 = document.getElementById('lbl-pat-each'); if (l2) l2.textContent = 'それぞれが' + w;
+        const l3 = document.getElementById('lbl-carrier-a'); if (l3) l3.textContent = 'Aが' + w;
+        const l4 = document.getElementById('lbl-carrier-b'); if (l4) l4.textContent = 'Bが' + w;
+        if (stairs) { rotation.x = 0.06; rotation.y = Math.PI / 2 - 0.15; camDist = 3.4; }
+        else { rotation.x = 0.14; rotation.y = 0.55; camDist = 3.6; }
+        updateScene();
+    }
+
+    function setSizeA(type) { checkRadio('sizeA', type); updateScene(); }
+    function setSizeB(type) { checkRadio('sizeB', type); updateScene(); }
+
+    function setDir(dir) { checkRadio('dir', dir); updateScene(); }
+
+    function setHold(hold) { updateScene(); } // 縦/横の選択欄は廃止（2026-11-20 ユーザー指示）: 階段の持ち方は縦持ちに固定。互換のため関数は残すが横持ちにはならない
+    function setPattern(p) {
+        checkRadio('pattern', p);
+        const cEl = document.getElementById('item-carrier');
+        if (cEl) { // それぞれの時は非表示にせずグレーアウト（🔞系の無効化デザイン: 見えるけど押せない）
+            cEl.style.opacity = p === 'one' ? '1' : '0.3';
+            cEl.style.pointerEvents = p === 'one' ? 'auto' : 'none';
+        }
+        updateScene();
+    }
+    function setCarrier(c) { checkRadio('carrier', c); updateScene(); }
+    function setPullPos(v) { checkRadio('pullpos', v); updateScene(); }
+
+    function swapAB() {
+        const fields = ['name', 'gender', 'height', 'color', 'colorCase'];
+        fields.forEach(field => {
+            const elA = document.getElementById(field + 'A');
+            const elB = document.getElementById(field + 'B');
+            const tmp = elA.value;
+            elA.value = elB.value;
+            elB.value = tmp;
+        });
+        const szA = radioVal('sizeA', 'fit'), szB = radioVal('sizeB', 'fit'); // 大きさも人ごとに付いて回る
+        checkRadio('sizeA', szB); checkRadio('sizeB', szA);
+        updateScene();
+    }
+
+    /* ================= マネキン（お座りシミュレーターの実モデルを移植し、脚もIK化） ================= */
+    function createMannequin(color, heightCm, gender, name, role) {
+        const group = new THREE.Group();
+        const h = heightCm * 0.01;
+        const bodyMat = new THREE.MeshPhongMaterial({ color: color, transparent: true, opacity: 0.85 });
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+
+        const headH = h * 0.13, neckH = h * 0.05, torsoH = h * 0.37, legH = h * 0.45;
+        const torsoW = (gender === 'male' ? 0.26 : 0.21) * (h / 1.7);
+        const torsoDepth = torsoW * 0.5;
+
+        const bodyGroup = new THREE.Group();
+        bodyGroup.position.y = legH;
+
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(torsoW, torsoH, torsoDepth), bodyMat);
+        torso.position.y = torsoH * 0.5;
+        bodyGroup.add(torso);
+
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(headH * 0.3, headH * 0.3, neckH, 16), bodyMat);
+        neck.position.y = torsoH + (neckH * 0.5);
+        bodyGroup.add(neck);
+
+        const localEyeY = torsoH + neckH + (headH * 0.3);
+        const headBox = new THREE.Group();
+        headBox.position.y = localEyeY;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(headH * 0.8, 16, 16), bodyMat);
+        head.position.y = (headH * 0.5) - (headH * 0.3);
+        headBox.add(head);
+        [-1, 1].forEach(side => {
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(headH * 0.12, 12, 12), eyeMat);
+            eye.position.set(side * (headH * 0.28), (headH * 0.5) - (headH * 0.3), (headH * 0.7));
+            headBox.add(eye);
+        });
+        bodyGroup.add(headBox);
+        group.headParts = headBox;
+        group.bodyGroup = bodyGroup;
+
+        group.arms = [];
+        [-1, 1].forEach(side => {
+            const anchor = new THREE.Group();
+            anchor.position.set(side * (torsoW * 0.6), torsoH - (torsoW * 0.15), 0);
+            const armLen = h * 0.38;
+            const upperLen = armLen * 0.54, foreLen = armLen * 0.51;
+            const upper = new THREE.Mesh(new THREE.BoxGeometry(torsoW * 0.3, upperLen, torsoW * 0.3), bodyMat);
+            upper.position.y = -upperLen * 0.5;
+            anchor.add(upper);
+            const elbow = new THREE.Group();
+            elbow.position.y = -upperLen;
+            const fore = new THREE.Mesh(new THREE.BoxGeometry(torsoW * 0.3, foreLen, torsoW * 0.3), bodyMat);
+            fore.position.y = -foreLen * 0.5;
+            elbow.add(fore);
+            anchor.add(elbow);
+            bodyGroup.add(anchor);
+            group.arms.push({ anchor: anchor, elbow: elbow, upperLen: upperLen, foreLen: foreLen, totalLen: armLen });
+        });
+
+        group.legs = [];
+        const thighLen = legH * 0.5, shinLen = legH * 0.5;
+        [-1, 1].forEach(side => {
+            const anchor = new THREE.Group();
+            anchor.position.set(side * (torsoW * 0.25), 0, 0);
+            const thigh = new THREE.Mesh(new THREE.BoxGeometry(torsoW * 0.4, thighLen, torsoW * 0.4), bodyMat);
+            thigh.position.y = -thighLen * 0.5;
+            anchor.add(thigh);
+            const knee = new THREE.Group();
+            knee.position.y = -thighLen;
+            const shin = new THREE.Mesh(new THREE.BoxGeometry(torsoW * 0.4, shinLen, torsoW * 0.4), bodyMat);
+            shin.position.y = -shinLen * 0.5;
+            knee.add(shin);
+            anchor.add(knee);
+            bodyGroup.add(anchor);
+            group.legs.push({ anchor: anchor, elbow: knee, upperLen: thighLen, foreLen: shinLen, totalLen: legH });
+        });
+
+        group.add(bodyGroup);
+
+        const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128;
+        const ctx = canvas.getContext('2d'); ctx.font = "bold 45px sans-serif"; ctx.fillStyle = "#333"; ctx.textAlign = "center";
+        const displayName = name || (role === 'B' ? 'B' : 'A');
+        ctx.fillText(`${displayName} (${heightCm.toFixed(1)}cm)`, 256, 64);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1.5, 0.38, 1);
+        group.add(sprite);
+        group.nameTag = sprite;
+
+        group.userData = { height: h, eyeY: legH + localEyeY, localEyeY: localEyeY, role: role, torsoW: torsoW, torsoDepth: torsoDepth, torsoH: torsoH, legH: legH, headH: headH };
+        return group;
+    }
+
+    /* 汎用2ボーンIK（お座りの poseArmTo をそのまま移植。腕・脚共通）
+       target は anchor の親 (bodyGroup) 内座標。pole 省略時はシリーズ標準の外側＋やや下＋後ろ */
+    function poseLimbTo(limb, target, pole) {
+        const S = limb.anchor.position;
+        const d = new THREE.Vector3().subVectors(target, S);
+        let D = d.length();
+        const maxD = (limb.upperLen + limb.foreLen) * 0.999;
+        if (D > maxD) { d.multiplyScalar(maxD / D); D = maxD; }
+        const dir = d.clone().divideScalar(D);
+        const cosA = Math.max(-1, Math.min(1, (limb.upperLen * limb.upperLen + D * D - limb.foreLen * limb.foreLen) / (2 * limb.upperLen * D)));
+        const angA = Math.acos(cosA);
+        const sideSign = limb.anchor.position.x >= 0 ? 1 : -1;
+        const w = pole ? pole.clone() : new THREE.Vector3(sideSign * 0.8, -0.15, -0.6);
+        w.addScaledVector(dir, -w.dot(dir));
+        if (w.lengthSq() < 1e-6) w.set(0, 1, 0); else w.normalize();
+        const u = dir.clone().multiplyScalar(Math.cos(angA)).addScaledVector(w, Math.sin(angA));
+        const gamma = Math.asin(Math.max(-1, Math.min(1, u.x)));
+        const theta = Math.atan2(-u.z, -u.y);
+        limb.anchor.rotation.set(theta, 0, gamma);
+        const E = S.clone().addScaledVector(u, limb.upperLen);
+        const T = S.clone().add(d);
+        const f = new THREE.Vector3().subVectors(T, E).normalize();
+        const invQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(theta, 0, gamma)).invert();
+        const fl = f.clone().applyQuaternion(invQ);
+        const gammaE = Math.asin(Math.max(-1, Math.min(1, fl.x)));
+        const thetaE = Math.atan2(-fl.z, -fl.y);
+        limb.elbow.rotation.set(thetaE, 0, gammaE);
+    }
+
+    function poseArmWorld(person, idx, worldTarget, pole) {
+        const local = person.bodyGroup.worldToLocal(worldTarget.clone());
+        poseLimbTo(person.arms[idx], local, pole);
+    }
+    function poseArmLocal(person, idx, localTarget, pole) {
+        poseLimbTo(person.arms[idx], localTarget, pole);
+    }
+    function restArmLocal(person, idx) {
+        const side = idx === 0 ? -1 : 1;
+        const torsoW = person.userData.torsoW;
+        const armLen = person.arms[idx].totalLen;
+        poseArmLocal(person, idx, new THREE.Vector3(side * (torsoW * 0.6 + 0.07), -(armLen * 0.80), 0.04));
+    }
+    /* 空き手の自然な振り: 肩を支点に手先が対側脚と逆位相の弧を描く。
+       肩→手先の距離 D で肘の曲がりを決める（前に振るほど少し曲げ、後ろでは伸び気味に）。
+       walkAmt=1 で歩行振り、0 で体の横に垂らした静止ポーズへ滑らかに寄せる */
+    function freeHandTarget(person, idx, gz, amp, walkAmt) {
+        const arm = person.arms[idx];
+        const sg = idx === 0 ? -1 : 1;
+        const span = arm.upperLen + arm.foreLen;
+        const shoulder = new THREE.Vector3(); arm.anchor.getWorldPosition(shoulder); // 実際の肩位置（体の傾き・回旋も反映した正確な距離で肘角を決める）
+        const ry = person.rotation.y;
+        const sideDir = new THREE.Vector3(Math.cos(ry), 0, -Math.sin(ry)); // 人のローカル+x軸のワールド方向
+        const fwdDir = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry)); // 人の正面のワールド方向
+        const fwd = amp > 0 ? Math.max(-1, Math.min(1, gz / amp)) : 0;
+        const bend = 0.5 + 0.5 * fwd;
+        const D = span * (0.995 - 0.010 * bend * walkAmt - 0.002 * (1 - walkAmt)); // 肘は常時わずかに曲がり、前へ振る時に少しだけ増える
+        const out = 0.012; // 肩の真下よりわずかに外: 前腕が胴体ボックス下角をかすめて貫通しない最小限 // 手は肩の真下＝太ももの外側のすぐ横（外へ広げない）
+        const swingZ = gz * walkAmt + 0.01 * (1 - walkAmt);
+        const reach = Math.sqrt(Math.max(D * D - swingZ * swingZ - out * out, 0.01));
+        return shoulder.addScaledVector(sideDir, sg * out).addScaledVector(fwdDir, swingZ).add(new THREE.Vector3(0, -reach, 0));
+    }
+    function swingArmWorld(person, idx) {
+        const side = idx === 0 ? -1 : 1;
+        const p = person.position, hipY = person.bodyGroup.position.y, torsoW = person.userData.torsoW;
+        poseArmWorld(person, idx, new THREE.Vector3(p.x + side * (torsoW * 0.6 + 0.05), p.y + hipY + person.userData.height * 0.06, p.z + person.userData.height * 0.15));
+    }
+    /* 脚: ankle のワールド目標へ（足先メッシュはなし、シリーズ準拠） */
+    function poseLegWorld(person, idx, ankleWorld, footPitch) {
+        const side = idx === 0 ? -1 : 1;
+        const local = person.bodyGroup.worldToLocal(ankleWorld.clone());
+        poseLimbTo(person.legs[idx], local, new THREE.Vector3(side * 0.04, 0, 1)); // 膝は足先の真上を通る（外へ張り出させない: がに股防止に外側成分は最小限、前主体）
+    }
+    function standingLegs(person, stagger) {
+        const p = person.position, torsoW = person.userData.torsoW, h = person.userData.height;
+        const s = stagger || [0, 0];
+        poseLegWorld(person, 0, new THREE.Vector3(p.x - torsoW * 0.25, p.y + ANKLE_Y, p.z + s[0] * h));
+        poseLegWorld(person, 1, new THREE.Vector3(p.x + torsoW * 0.25, p.y + ANKLE_Y, p.z + s[1] * h));
+    }
+    /* IKで実際に届いた手先のワールド位置（検証用） */
+    function limbTipWorld(person, limb, worldTarget) {
+        const S = new THREE.Vector3(); limb.anchor.getWorldPosition(S);
+        const E = new THREE.Vector3(); limb.elbow.getWorldPosition(E);
+        const dir = new THREE.Vector3().subVectors(worldTarget, E);
+        if (dir.lengthSq() < 1e-9) return E;
+        return E.addScaledVector(dir.normalize(), limb.foreLen);
+    }
+
+    /* ================= キャリーケース ================= */
+    function setBar(mesh, a, b, r) {
+        const dir = new THREE.Vector3().subVectors(b, a);
+        const len = Math.max(dir.length(), 0.0001);
+        mesh.position.copy(a).addScaledVector(dir, 0.5);
+        mesh.scale.set(r, len, r);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    }
+    function createCase(colorHex, dims) {
+        const g = new THREE.Group();
+        const mat = new THREE.MeshPhongMaterial({ color: colorHex });
+        const darkMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const metalMat = new THREE.MeshPhongMaterial({ color: 0xb9b9c2 });
+        const H = dims.H, W = dims.W, D = dims.D;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat);
+        g.add(body);
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(W * 1.01, H * 0.5, D * 1.01), new THREE.MeshPhongMaterial({ color: colorHex, transparent: true, opacity: 0.55 }));
+        trim.position.y = H * 0.1;
+        g.add(trim);
+        // 車輪: 四隅のスピナーキャスター（台座＋車軸＋ダブルホイール）。車輪の底は -H/2 - WHEEL_DROP にそろえる
+        // 車輪はジオメトリ側で軸をXに倒し、mesh.rotation.x で転がせるようにする
+        const wheelR = 0.027, wheelCenterY = -H / 2 - WHEEL_DROP + wheelR;
+        const wheels = [], casters = [];
+        [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(c => {
+            const cx = c[0] * (W / 2 - 0.052), cz = c[1] * (D / 2 - 0.052);
+            const cg = new THREE.Group(); cg.position.set(cx, 0, cz); g.add(cg); casters.push(cg); // 角ごとのキャスター一式（引く・横つけでケースを90°回した時、車輪だけ進行方向へ向け直せるように）
+            const housing = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.06), darkMat);
+            housing.position.set(0, -H / 2 - 0.004, 0); cg.add(housing);
+            const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.052, 8), metalMat);
+            axle.rotation.z = Math.PI / 2; axle.position.set(0, wheelCenterY, 0); cg.add(axle);
+            [-1, 1].forEach(s => {
+                const wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.013, 16);
+                wheelGeo.rotateZ(Math.PI / 2);
+                const wheel = new THREE.Mesh(wheelGeo, darkMat);
+                wheel.position.set(s * 0.0165, wheelCenterY, 0);
+                cg.add(wheel); wheels.push(wheel);
+            });
+        });
+        // 上面ハンドル（台座プレート＋取付部＋カプセル型グリップ）。グリップ中心は topGripLocal と同じ高さ
+        const topPlate = new THREE.Mesh(new THREE.BoxGeometry(W * 0.46, 0.008, 0.09), darkMat);
+        topPlate.position.set(0, H / 2 + 0.004, 0); g.add(topPlate);
+        const mountGeo = new THREE.BoxGeometry(0.036, 0.032, 0.046);
+        [-1, 1].forEach(s => {
+            const mount = new THREE.Mesh(mountGeo, darkMat);
+            mount.position.set(s * W * 0.17, H / 2 + 0.02, 0); g.add(mount);
+        });
+        const topGrip = new THREE.Mesh(new THREE.CapsuleGeometry(0.017, W * 0.34, 4, 10), darkMat);
+        topGrip.rotation.z = Math.PI / 2;
+        topGrip.position.set(0, H / 2 + 0.045, 0); g.add(topGrip);
+        // 横持ち専用の長辺側グリップ（前面 +z）。縦持ちの時は表示しない
+        const sideGripGroup = new THREE.Group();
+        const sgPlate = new THREE.Mesh(new THREE.BoxGeometry(W * 0.4, H * 0.46, 0.008), darkMat);
+        sgPlate.position.set(0, 0, D / 2 + 0.004); sideGripGroup.add(sgPlate);
+        const sgMountGeo = new THREE.BoxGeometry(0.046, 0.036, 0.032);
+        [-1, 1].forEach(s => {
+            const mount = new THREE.Mesh(sgMountGeo, darkMat);
+            mount.position.set(0, s * H * 0.17, D / 2 + 0.02); sideGripGroup.add(mount);
+        });
+        const sgGrip = new THREE.Mesh(new THREE.CapsuleGeometry(0.017, H * 0.34, 4, 10), darkMat);
+        sgGrip.position.set(0, 0, D / 2 + 0.045); sideGripGroup.add(sgGrip);
+        sideGripGroup.visible = false;
+        g.add(sideGripGroup);
+        // 伸縮ハンドル（レール2本＋グリップ＋端キャップ）: ケースの子として剛体固定（引く姿勢で上を向く +z 面側から伸ばした形）。手だけがグリップに追従する
+        const railGeo = new THREE.CylinderGeometry(1, 1, 1, 8);
+        const railL = new THREE.Mesh(railGeo, metalMat); g.add(railL);
+        const railR = new THREE.Mesh(railGeo, metalMat); g.add(railR);
+        const grip = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), darkMat); g.add(grip);
+        const gripCapGeo = new THREE.SphereGeometry(0.021, 12, 10);
+        const gripCapL = new THREE.Mesh(gripCapGeo, darkMat); g.add(gripCapL);
+        const gripCapR = new THREE.Mesh(gripCapGeo, darkMat); g.add(gripCapR);
+        const teleBaseZ = D / 2 - 0.03, teleTopY = H / 2 + 0.40, teleTopZ = teleBaseZ; // レールはケース長軸（ローカルY）と平行に真っ直ぐ伸ばす: 基部と頂部で x・z を一致させる（旧: 基部±0.30W→頂部±0.11の収束＋頂部が12mm外側で、伸長が短い構成ほど最大16.7°曲がって見えた）
+        setBar(railL, new THREE.Vector3(-0.11, H / 2 - 0.02, teleBaseZ), new THREE.Vector3(-0.11, teleTopY, teleTopZ), 0.0135);
+        setBar(railR, new THREE.Vector3(0.11, H / 2 - 0.02, teleBaseZ), new THREE.Vector3(0.11, teleTopY, teleTopZ), 0.0135);
+        setBar(grip, new THREE.Vector3(-0.11, teleTopY, teleTopZ), new THREE.Vector3(0.11, teleTopY, teleTopZ), 0.019);
+        gripCapL.position.set(-0.11, teleTopY, teleTopZ);
+        gripCapR.position.set(0.11, teleTopY, teleTopZ);
+        railL.visible = railR.visible = grip.visible = gripCapL.visible = gripCapR.visible = false;
+        g.userData = { dims: dims, railL: railL, railR: railR, grip: grip, gripCapL: gripCapL, gripCapR: gripCapR, wheels: wheels, casters: casters, wheelR: wheelR, sideGripGroup: sideGripGroup, sideGripLocal: new THREE.Vector3(0, 0, D / 2 + 0.045), teleGripC: new THREE.Vector3(0, teleTopY, teleTopZ), teleGripL: new THREE.Vector3(-0.11, teleTopY, teleTopZ), teleGripR: new THREE.Vector3(0.11, teleTopY, teleTopZ), teleHome: { topY: teleTopY, topZ: teleTopZ, baseZ: teleBaseZ } };
+        g.userData.topGripLocal = new THREE.Vector3(0, H / 2 + 0.045, 0);
+        g.userData.wheelBottomLocal = -H / 2 - WHEEL_DROP;
+        return g;
+    }
+    /* 伸縮ハンドルはケースに固定済み。出す/隠すは表示切替だけ */
+    function showTelescopic(caseObj) {
+        const u = caseObj.userData;
+        u.railL.visible = u.railR.visible = u.grip.visible = u.gripCapL.visible = u.gripCapR.visible = true;
+    }
+    function hideTelescopic(caseObj) {
+        const u = caseObj.userData;
+        u.railL.visible = u.railR.visible = u.grip.visible = u.gripCapL.visible = u.gripCapR.visible = false;
+    }
+    /* 伸縮ハンドルの伸ばし量（グリップ中心の高さ）を組み直す。毎フレーム同じ値で呼ぶため、ケースに対しては剛体のまま */
+    function setTelescopicPose(caseObj, topY) {
+        const u = caseObj.userData, dims = u.dims, home = u.teleHome;
+        setBar(u.railL, new THREE.Vector3(-0.11, dims.H / 2 - 0.02, home.baseZ), new THREE.Vector3(-0.11, topY, home.topZ), 0.0135);
+        setBar(u.railR, new THREE.Vector3(0.11, dims.H / 2 - 0.02, home.baseZ), new THREE.Vector3(0.11, topY, home.topZ), 0.0135);
+        setBar(u.grip, new THREE.Vector3(-0.11, topY, home.topZ), new THREE.Vector3(0.11, topY, home.topZ), 0.019);
+        u.gripCapL.position.set(-0.11, topY, home.topZ);
+        u.gripCapR.position.set(0.11, topY, home.topZ);
+        u.teleGripC.set(0, topY, home.topZ); u.teleGripL.set(-0.11, topY, home.topZ); u.teleGripR.set(0.11, topY, home.topZ);
+    }
+
+    /* ================= 環境（駅の階段: 地面→15段→踊り場→15段→上の階） ================= */
+    function buildEnvironment(mode) {
+        while (envGroup.children.length > 0) envGroup.remove(envGroup.children[0]);
+        tactStepBands = []; tactLandBands = [];
+        if (mode !== 'stairs') return;
+        const concMat = new THREE.MeshPhongMaterial({ color: 0xb5b5b0 }); // 統一したコンクリートグレー
+        const noseMat = new THREE.MeshPhongMaterial({ color: 0x3c3f42 }); // 段鼻の滑り止め（濃色）
+        const tactMat = new THREE.MeshPhongMaterial({ color: 0xf2c618 }); // 点字ブロック風の黄色い帯
+        const railMat = new THREE.MeshPhongMaterial({ color: 0xd2d5d9, specular: 0x999999, shininess: 90 }); // ステンレス風
+        const postMat = new THREE.MeshPhongMaterial({ color: 0xb9bdc2, specular: 0x888888, shininess: 70 });
+        const landTop = STAIR_H * STAIR_STEPS;
+        // 段（2つのフライト）
+        for (let f = 0; f < 2; f++) {
+            const zBase = f === 0 ? FLIGHT1_Z0 : FLIGHT2_Z0;
+            const yBase = f === 0 ? 0 : landTop;
+            for (let i = 0; i < STAIR_STEPS; i++) {
+                const top = yBase + (i + 1) * STAIR_H;
+                const step = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W, top, STAIR_D), concMat);
+                step.position.set(0, top / 2, zBase + (i + 0.5) * STAIR_D);
+                envGroup.add(step);
+                const nose = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W, 0.02, 0.04), noseMat);
+                nose.position.set(0, top - 0.01, zBase + i * STAIR_D + 0.02); // 段鼻（蹴上げ面のすぐ上の縁）側
+                envGroup.add(nose);
+                const tact = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W, 0.005, 0.055), tactMat);
+                tact.position.set(0, top + 0.0025, zBase + i * STAIR_D + 0.045); // 黄色い帯も段鼻側の縁に
+                envGroup.add(tact);
+                tactStepBands.push(tact.position.z);
+            }
+        }
+        // 踊り場（踏面4枚分）＋両端の黄色い帯
+        const land = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W, landTop, LAND_D), concMat);
+        land.position.set(0, landTop / 2, LAND_Z0 + LAND_D / 2);
+        envGroup.add(land);
+        [[LAND_Z0 + 0.22], [FLIGHT2_Z0 - 0.22]].forEach(([z]) => {
+            const band = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W * 0.92, 0.006, 0.30), tactMat);
+            band.position.set(0, landTop + 0.003, z);
+            envGroup.add(band);
+            tactLandBands.push(z);
+        });
+        // 下のアプローチ地面（手前に黄色い帯）と上の階の床（出口に黄色い帯）
+        const approach = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.02, 3.8), concMat);
+        approach.position.set(0, -0.01, -1.9);
+        envGroup.add(approach);
+        const appBand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W * 0.92, 0.006, 0.30), tactMat);
+        appBand.position.set(0, 0.003, -0.5);
+        envGroup.add(appBand);
+        const upper = new THREE.Mesh(new THREE.BoxGeometry(4.4, TOP_H, 3.0), concMat);
+        upper.position.set(0, TOP_H / 2, TOP_Z0 + 1.5);
+        envGroup.add(upper);
+        const topBand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W * 0.92, 0.006, 0.30), tactMat);
+        topBand.position.set(0, TOP_H + 0.003, TOP_Z0 + 0.45);
+        envGroup.add(topBand);
+        // 両脇の壁（側板）: 段の側面プロファイルで押し出した壁にし、箱の積み重ねに見えないようにする
+        const wallMat = new THREE.MeshPhongMaterial({ color: 0xa9a9a3 });
+        const prof = [[-3.8, -0.06], [13.9, -0.06], [13.9, TOP_H], [TOP_Z0, TOP_H], [FLIGHT2_Z0, landTop], [LAND_Z0, landTop], [FLIGHT1_Z0, 0], [-3.8, 0]];
+        const shape = new THREE.Shape();
+        prof.forEach(([zx, hy], idx) => { if (idx === 0) shape.moveTo(zx, hy); else shape.lineTo(zx, hy); });
+        shape.closePath();
+        const wallGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false });
+        wallGeo.rotateY(-Math.PI / 2); // shape の x をワールド z、押し出しをワールド x に
+        [-1, 1].forEach(sx => {
+            const wall = new THREE.Mesh(wallGeo, wallMat);
+            wall.position.x = sx > 0 ? STAIR_W / 2 + 0.08 : -STAIR_W / 2;
+            envGroup.add(wall);
+        });
+        // 手すり: 両側＋中央（二重）。段鼻の線から約0.85m上を、平地は水平・階段は勾配に沿わせる。支柱は等間隔
+        const railY = z => z < 0 ? 0.85
+            : (z <= LAND_Z0 ? 0.85 + 0.5 * z
+            : (z <= FLIGHT2_Z0 ? landTop + 0.85
+            : (z <= TOP_Z0 ? landTop + 0.85 + 0.5 * (z - FLIGHT2_Z0) : TOP_H + 0.85)));
+        const railPts = [-2.6, 0, LAND_Z0, FLIGHT2_Z0, TOP_Z0, 12.9];
+        const postZs = [-2.0, 1.28, 2.56, 3.84, 5.44, 7.36, 8.64, 9.92, 11.9];
+        function railRun(xs) {
+            xs.forEach(x => {
+                for (let i = 0; i < railPts.length - 1; i++) {
+                    const bar = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 10), railMat);
+                    setBar(bar, new THREE.Vector3(x, railY(railPts[i]), railPts[i]), new THREE.Vector3(x, railY(railPts[i + 1]), railPts[i + 1]), 0.022);
+                    envGroup.add(bar);
+                }
+            });
+        }
+        railRun([-(STAIR_W / 2 - 0.06), STAIR_W / 2 - 0.06, -0.10, 0.10]);
+        postZs.forEach(z => {
+            [-(STAIR_W / 2 - 0.06), STAIR_W / 2 - 0.06, 0].forEach(x => {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 8), postMat);
+                setBar(post, new THREE.Vector3(x, heightAt(z), z), new THREE.Vector3(x, railY(z), z), 0.016);
+                envGroup.add(post);
+            });
+        });
+        // 駅らしい小物: 踊り場の上に吊り下げサイン（のぼり／くだり）
+        // レーン定義（左側通行: 上り=+xレーン／下り=−xレーン）と看板の左右を一致させる。
+        // 登る人が見る面(-z)では「のぼり」が左(+x側)、下りる人が見る面(+z)では「くだり」が左(−x側)に来るよう面ごとに描く
+        const makeSignTex = text => {
+            const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+            const cx2 = cv.getContext('2d');
+            cx2.fillStyle = '#203040'; cx2.fillRect(0, 0, 512, 128);
+            cx2.fillStyle = '#ffffff'; cx2.font = 'bold 54px sans-serif'; cx2.textAlign = 'center';
+            cx2.fillText(text, 256, 84);
+            return new THREE.CanvasTexture(cv);
+        };
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 0.05), new THREE.MeshPhongMaterial({ color: 0x203040 }));
+        const signFace = new THREE.Mesh(new THREE.PlaneGeometry(1.44, 0.36), new THREE.MeshBasicMaterial({ map: makeSignTex('くだり ↓　のぼり ↑') }));
+        signFace.position.z = 0.028; sign.add(signFace);
+        const signFace2 = new THREE.Mesh(new THREE.PlaneGeometry(1.44, 0.36), new THREE.MeshBasicMaterial({ map: makeSignTex('のぼり ↑　くだり ↓') }));
+        signFace2.rotation.y = Math.PI; signFace2.position.z = -0.028; sign.add(signFace2);
+        sign.position.set(0, landTop + 2.1, LAND_Z0 + LAND_D / 2);
+        envGroup.add(sign);
+        [-0.5, 0.5].forEach(x => {
+            const rod = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 8), postMat);
+            setBar(rod, new THREE.Vector3(x, landTop + 2.3, LAND_Z0 + LAND_D / 2), new THREE.Vector3(x, landTop + 3.3, LAND_Z0 + LAND_D / 2), 0.012);
+            envGroup.add(rod);
+        });
+    }
+
+/* ================= レイアウト（再構築は updateScene、ポーズは applyPose が時刻で当てる） ================= */
+function updateScene() {
+const mode = radioVal('mode', 'stairs');
+const sizeTypeA = radioVal('sizeA', 'fit'), sizeTypeB = radioVal('sizeB', 'fit');
+const hA = parseFloat(document.getElementById('heightA').value) || 158, hB = parseFloat(document.getElementById('heightB').value) || 171.5;
+const specA = caseFor(hA, sizeTypeA), specB = caseFor(hB, sizeTypeB);
+const dimsA = caseDims(specA), dimsB = caseDims(specB);
+const nA = document.getElementById('nameA').value || 'A', nB = document.getElementById('nameB').value || 'B';
+
+if (personA) stageGroup.remove(personA);
+if (personB) stageGroup.remove(personB);
+while (caseGroup.children.length > 0) caseGroup.remove(caseGroup.children[0]);
+
+buildEnvironment(mode);
+
+personA = createMannequin(document.getElementById('colorA').value, hA, document.getElementById('genderA').value, document.getElementById('nameA').value, 'A');
+personB = createMannequin(document.getElementById('colorB').value, hB, document.getElementById('genderB').value, document.getElementById('nameB').value, 'B');
+caseAObj = createCase(document.getElementById('colorCaseA').value, dimsA);
+caseBObj = createCase(document.getElementById('colorCaseB').value, dimsB);
+caseGroup.add(caseAObj);
+caseGroup.add(caseBObj);
+stageGroup.add(personA); stageGroup.add(personB);
+personA.headParts.rotation.set(0, 0, 0);
+personB.headParts.rotation.set(0, 0, 0);
+
+layout = { mode: mode, sizeTypeA: sizeTypeA, sizeTypeB: sizeTypeB, specA: specA, specB: specB, dimsA: dimsA, dimsB: dimsB, nA: nA, nB: nB, hA: hA, hB: hB,
+    legHA: personA.userData.legH, legHB: personB.userData.legH,
+    dir: radioVal('dir', 'up'), hold: 'v' /* 縦持ち固定（縦/横の選択欄は廃止） */, pattern: radioVal('pattern', 'one'), carrier: radioVal('carrier', 'B'), pullPos: radioVal('pullpos', 'back') };
+
+const sizeNameOf = st => st === 'fit' ? '身の丈' : st;
+const caseRow = (n, spec, st) => `<div class="info-row"><span class="info-label">🧳 ${n}のケース</span><span class="info-value" style="font-size:14px;">${spec.h}cm ／ ${spec.vol}L ／ 約${spec.kg}kg（${sizeNameOf(st)}）</span></div>`;
+document.getElementById('info').innerHTML = `
+<div class="info-row"><span class="info-label">📏 身長差</span><span class="info-value">${Math.abs(hA - hB).toFixed(1)}<span class="unit">cm</span></span></div>
+${caseRow(nA, specA, sizeTypeA)}
+${caseRow(nB, specB, sizeTypeB)}
+`;
+measure.specA = specA; measure.specB = specB;
+animTime = 0;
+animClock.getDelta();
+applyPose(0);
+}
+
+/* FKで実際の足首（手先）位置を取る（検証用） */
+function limbFKTip(person, limb) {
+const E = new THREE.Vector3(); limb.elbow.getWorldPosition(E);
+const q = limb.elbow.getWorldQuaternion(new THREE.Quaternion());
+return E.add(new THREE.Vector3(0, -limb.foreLen, 0).applyQuaternion(q));
+}
+function spinWheels(caseObj, spin) { caseObj.userData.wheels.forEach(w => { w.rotation.x = spin; }); }
+
+function applyPose(t) {
+if (!layout || !personA || !personB) return;
+measure.animTime = t;
+if (layout.mode === 'stairs') applyStairs(t);
+else if (layout.mode === 'pull') applyPull(t);
+else applyPull(t);
+measure.pelvisYawA = personA.bodyGroup.rotation.y * 180 / Math.PI;
+measure.pelvisYawB = personB.bodyGroup.rotation.y * 180 / Math.PI;
+measure.pelvisRollA = personA.bodyGroup.rotation.z * 180 / Math.PI;
+measure.pelvisRollB = personB.bodyGroup.rotation.z * 180 / Math.PI;
+[personA, personB].forEach(p => {
+p.userData.eyeY = p.bodyGroup.position.y + p.userData.localEyeY;
+p.nameTag.position.y = p.bodyGroup.position.y + p.userData.localEyeY + p.userData.headH + 0.25;
+});
+personA.headParts.visible = (currentView !== 'A');
+personA.nameTag.visible = (currentView !== 'A');
+personB.headParts.visible = (currentView !== 'B');
+personB.nameTag.visible = (currentView !== 'B');
+document.getElementById('view-label').innerText = currentView === 'A' ? layout.nA + 'の視点' : (currentView === 'B' ? layout.nB + 'の視点' : '三人称視点');
+stageGroup.updateMatrixWorld(true);
+{ const vpA = new THREE.Vector3(), vpB = new THREE.Vector3(); personA.bodyGroup.getWorldPosition(vpA); personB.bodyGroup.getWorldPosition(vpB); measure.pelvisA = [vpA.x, vpA.y, vpA.z]; measure.pelvisB = [vpB.x, vpB.y, vpB.z]; }
+measure.ankleA = [0, 1].map(i => { const v = limbFKTip(personA, personA.legs[i]); return [v.x, v.y, v.z]; });
+measure.ankleB = [0, 1].map(i => { const v = limbFKTip(personB, personB.legs[i]); return [v.x, v.y, v.z]; });
+if (layout.mode === 'stairs' && lastFeet) { // 検証用: IK目標（到達できていれば FK と一致する）
+measure.ankleTargetA = lastFeet.A.ankles.map(v => [v.x, v.y, v.z]);
+measure.ankleTargetB = lastFeet.B.ankles.map(v => [v.x, v.y, v.z]);
+}
+}
+
+/* 階段: person の position.z/y・bodyGroup.y を決め、足首目標と歩行位相(rad)を返す */
+function stairFeet(person, sched, seg, tt, isB, isDown, loadKg = 0) { // loadKg: その人が持つ荷物の合計kg（重量感の演出用。持っていない人は 0 で従来どおり）
+const legH = person.userData.legH, torsoW = person.userData.torsoW;
+// 体のzはスケジュールの折れ点を ±0.2s のカーネルで均す（区間境界で体の前進速度が 0.4〜1.0m/s 段差になっていたのを消す。足の着地位置は絶対座標なので影響しない）
+const zBody = (schedZ(sched, Math.max(0, tt - 0.2)) + 2 * schedZ(sched, tt) + schedZ(sched, Math.min(CYCLE_T, tt + 0.2))) / 4;
+person.position.z = zBody;
+const x = person.position.x;
+const walkAmt0 = smooth01(tt / 0.9); // 歩き始めは腕の振りが滑らかに立ち上がる（下りでは te→0 の到着で 0 に戻る）
+const cosY = Math.cos(person.rotation.y); // 下りで180°回転したらワールド側の左右が入れ替わる
+const ankle = (i, z, top, lift) => new THREE.Vector3(x + cosY * (i === 0 ? -1 : 1) * torsoW * 0.25, top + ANKLE_Y + (lift || 0), z);
+// 平地歩行ポーズ（階段区間の入口・出口でこのポーズへブレンドし、区間境界の瞬間移動を消す）
+const flatCyc = isB ? 0.78 : 0.72;
+const flatPose = () => {
+const ph = tt * Math.PI * 2 / flatCyc;
+// 振幅は区間の実速度（±0.35sで均したスケジュール速度）に合わせる: 支持足の後退速度＝体の前進速度にして平地区間のフットスケートを消す（固定振幅だと B のアプローチで 0.51m/s 滑っていた）
+const tS0 = Math.max(0, tt - 0.35), tS1 = Math.min(CYCLE_T, tt + 0.35);
+const vSm = (schedZ(sched, tS1) - schedZ(sched, tS0)) / Math.max(tS1 - tS0, 1e-6);
+const amp = Math.max(0.07, Math.min(0.26, 0.3 * vSm * flatCyc));
+const ankles = [0, 1].map(i => {
+const g = gaitLeg(tt / flatCyc + i * 0.5, amp);
+const az = zBody + g.z;
+return ankle(i, az, rampHeightAt(az), g.lift * 0.055); // 段面はランプ（連続）で取る: スイング足が段鼻を跨ぐ瞬間の16cm跳びを消す
+});
+return { ankles: ankles, grpY: legH + (0.5 - 0.5 * Math.cos(2 * ph)) * 0.02, phase: ph };
+};
+// 足裏の高さの基準: 段鼻の手前0.10mをランプ化した段面（足の真下の面に追従する。0.12m先読み＋着地先頭打ちの旧方式は、着地位置が段鼻に近い交互足で次の段を拾い、離地直後に足首が最大8.6cm引っ張り上げられ、着地前は段面+3mmを水平に滑るホバースライドになっていた。窓を0.05mまで狭めると今度は16cmの上昇が25msに圧縮され足首が跳ねたため、0.10mに落ち着かせた）
+const profAt = z => {
+const h0 = heightAt(z);
+if (heightAt(z + 0.10) <= h0) return h0;
+let lo = 0, hi = 0.10;
+for (let it = 0; it < 10; it++) { const mid = (lo + hi) / 2; if (heightAt(z + mid) > h0) hi = mid; else lo = mid; } // 10回で分解能0.3mm（6回=4.7mmではランプ目標が階段状になりケース高さが小刻みに跳ぶ）
+const u = Math.max(0, 1 - hi / 0.10);
+return h0 + (heightAt(z + 0.10) - h0) * (u * u * (3 - 2 * u));
+};
+// 足首ブレンド: x/z は線形、y は「profAt 段面からの高さ」を混ぜる（飛行側・平地側どちらの足も profAt 基準で沈まないことが保証できる）
+const blendAnkles = (aA, aB, w) => aA.map((a, i) => {
+const b = aB[i];
+const z = a.z + (b.z - a.z) * w;
+const yA = a.y - profAt(a.z), yB = b.y - profAt(b.z);
+return new THREE.Vector3(a.x + (b.x - a.x) * w, profAt(z) + yA + (yB - yA) * w, z);
+});
+// フライト区間のポーズ計算（副作用なし）: 本体のフライト処理と、平地区間終端の「事前収束」（次のフライトの開始ポーズを先に求める）で共用する
+const computeFlight = (segF, ltF) => {
+    const flightZ0 = segF === 1 ? FLIGHT1_Z0 : FLIGHT2_Z0;
+    const baseY = segF === 1 ? 0 : STAIR_H * STAIR_STEPS;
+    const localT = ltF;
+    const place = s => s < 0 ? { z: flightZ0 - 0.17, top: baseY } : { z: flightZ0 + (s + 0.5) * STAIR_D + 0.02 + (stepVary(s * 7 + 13) * 0.035 - 0.010), top: baseY + (s + 1) * STAIR_H }; // 着地位置は段ごとの個体差を残しつつ、踏面の奥寄りにしっかり置く（2026-11-20 現実寄せ）: 基準を中央から +2cm 奥へ寄せ、ばらつきは段鼻側（−z）を絞った非対称（−1.0〜+2.5cm、旧 ±2.5cm）。踵の段鼻はみ出しを身長120〜220cmで実測し、旧配置で 220cm の揃え足に出ていた −1.5cm（段鼻割れ）が +0.5cm に収まることを確認
+    // 補正付き平滑 max/min（a=b でバイアス0、微分連続）。素の Math.max/min の切替点では足首の高さ速度が 2〜3m/s 跳んでいた（実測: 先行足 f≈0.14、揃え足 f≈0.67）
+    const smaxL = (a, b, k) => { const s = (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2; const dq = (a - b) / k; return s - (k / 2) * Math.exp(-dq * dq); };
+    const sminL = (a, b, k) => -smaxL(-a, -b, k);
+    const lerpPlace = (a, b, u, liftScale) => {
+    // 参考版の形（揃え足の足運び用）: 高さは「真下の段面（profAt）を着地先の段面で頭打ちしたもの」と「zの進行に比例して a.top→b.top へ移る高さ」の高い方＋スイングの弧（最大5.5cm）。始点のリフト（蹴り出しのヒールレイズ）は引き継いで減衰。max/min の合成だけ平滑版（smaxL/sminL）に替えて切替キンクを消す（端点の値は一致）
+    const z = a.z + (b.z - a.z) * u;
+    const lift = smaxL(Math.sin(u * Math.PI) * 0.055 * (liftScale || 1), (a.lift || 0) * (1 - u), 0.008);
+    const topI = b.z !== a.z ? a.top + (b.top - a.top) * ((z - a.z) / (b.z - a.z)) : a.top;
+    return { z: z, top: smaxL(sminL(profAt(z), b.top, 0.035), topI, 0.035), lift: lift }; // top の合成バンドは広め（0.035）: profAt ランプ（0.16m上昇/0.10m）は勾配が急で、バンドが狭いと追従切替が数msに圧縮され足首y速度が 1.2→4.8m/s に跳んだ（実測）。バンド内の最大の下振れ ~1cm はスイングのリフト（約5cm）の範囲内
+    };
+    // ===== 階段歩行（参考版の骨格＋当方版の脚の曲げ具合） =====
+    // 足運びの骨格（着地・離地のタイミング、スイングの形、位相）は参考版の実装を移植。骨盤の高さは当方版の「受け脚の到達から逆算」で決め、支持膝の伸展サイクル（着地で曲がる→持ち上げで伸びる）を当方版と同等に保つ。
+    // 揃え足（担当者）: 骨盤 z も当方版（スイング中は支持足の真上／着地後の体重移動でのみ前進・上昇、anchorH＋capH）。
+    // 交互足（後続）: 骨盤 z は参考版どおり勾配フローを連続的に進み、高さだけ接地足の到達アンカーを着地足へブレンドして決める。
+    const DX = torsoW * 0.25;
+    const EXT = 0.998 * legH, CAPL = 0.999 * legH; // EXT=目標伸展: 上昇局面の終わりに支持脚の膝がほぼ伸び切る高さ。骨盤ヨーで股関節が前後に最大3mm強ずれる分も見込んで 0.997（幾何で残り約9°、実測でも15°以内）。低い固定値だと両膝が深く曲がる空気椅子・クロウチ歩行になる（実測で確認）
+    const anchorH = (ankY, dzOff) => ankY + Math.sqrt(Math.max(EXT * EXT - DX * DX - dzOff * dzOff, Math.pow(0.5 * legH, 2)));
+    const capH = (ankY, ankZ, pz) => { const dz = pz - ankZ; return ankY + Math.sqrt(Math.max(CAPL * CAPL - DX * DX - dz * dz, Math.pow(0.5 * legH, 2))); };
+    // 体重移動のイーズ: 台形速度プロファイル（速度が 0→P→0 の台形）。端点の速度が 0 なので体重移動の開始・終了で骨盤速度が跳ばない（旧 eT=線形+smooth01 は端点の傾きが 0.5 残り、f=0.35/0.55 で骨盤z速度が約0.8m/s瞬間変化していた＝実測）。P は面積1から決まり、a1=a2=0.25 でピーク 4/3 倍（旧 eT と同等）、smooth01（1.5倍）より低い
+    const trapE = (u, a1, a2) => { u = clamp01(u); const P = 1 / (1 - (a1 + a2) / 2); if (u < a1) return P * u * u / (2 * a1); if (u > 1 - a2) { const v = 1 - u; return 1 - P * v * v / (2 * a2); } return P * (u - a1 / 2); };
+    const eT = u => trapE(u, 0.25, 0.25); // 交互足のアンカーブレンド用（対称）
+    const eTB = u => trapE(u, 0.40, 0.15); // 担当者（揃え足）の体重移動用: 立ち上がりが緩く後半で踏ん張って伸び上がる非対称（ピーク 1.38 倍）。重い荷物を持ち上げる時の力の入り方
+    const smin = (x, y, e) => { const w = smooth01(0.5 + (x - y) / (2 * e)); return x * (1 - w) + y * w; }; // 頭打ちの継ぎ目で骨盤速度が跳ねないよう min を滑らかに。ブレンド型（x=y でちょうど x を返し、アンダーシュートなし）: 旧ポリノミアル型は x≈y で最大 e/4=2.5mm 沈み、サイクル境界（次サイクルの pyStart は素の値）との間で毎段2.1mmの位置ステップになっていた（実測）
+    let ank, support, airborne, flightPZ, flightPY, riseFloat, flightPhase, phaseStart, phaseEnd;
+    if (isB) {
+        // ===== 揃え足（参考版の骨格＋当方版の骨盤） =====
+        // 足運びは参考版: 先行足が着地（f=0.35）→ 体が持ち上がる → 後ろ足は上昇の後半（f=0.55〜0.93）で揃えに来る（着地は先行足の5cm後ろ）。蹴り出しのヒールリフト0.07、揃え足の進み方は参考版の sin（上り）／smooth（下り）
+        // 骨盤は当方版: z は「スイング中は支持足の真上／着地後の体重移動でのみ進む」、高さは受け脚の到達から逆算（支持膝の伸展サイクルを保つ）
+        const cyc = 0.9;
+        const k = Math.min(STAIR_STEPS - 1, Math.floor(localT / cyc));
+        const f = Math.min(1, (localT - k * cyc) / cyc);
+        const lead = place(k), prev = place(k - 1);
+        const liftScale = 0.9 + 0.25 * stepVary(k);
+        const joinLead = { z: lead.z - 0.05, top: lead.top }, joinPrev = { z: prev.z - 0.05, top: prev.top };
+        let p1, p0;
+        if (f < 0.35) { const u = smooth01(f / 0.35); p1 = lerpPlace(prev, lead, u, liftScale); }
+        else p1 = { z: lead.z, top: lead.top, lift: 0 };
+        const toeR = smooth01((f - 0.38) / 0.17); // 蹴り出しのつま先ロール（f=0.38→0.55 で立ち上がり）: 踵が浮いて足首が前へ転がる。骨盤の上昇中も下段に残る足が届く幾何にするため参考版（リフト0.07）より強め（リフト0.10＋前進0.03）、スイング側の始点も同じ値で受けて連続させる
+        if (f < 0.55) p0 = { z: joinPrev.z + 0.03 * toeR, top: prev.top, lift: 0.10 * toeR };
+        else if (f < 0.93) { const u = isDown ? smooth01((f - 0.55) / 0.38) : Math.sin(clamp01((f - 0.55) / 0.38) * Math.PI / 2); p0 = lerpPlace({ z: joinPrev.z + 0.03, top: prev.top, lift: 0.10 }, joinLead, u, liftScale); }
+        else p0 = { z: joinLead.z, top: lead.top, lift: 0 };
+        if (f >= 0.55 && f < 0.63) { const wB = smooth01((f - 0.55) / 0.08), sz = joinPrev.z + 0.03; p0 = { z: sz + (p0.z - sz) * wB, top: prev.top + (p0.top - prev.top) * wB, lift: 0.10 + (p0.lift - 0.10) * wB }; } // 離地の継ぎ目: スイング側（上りの sin イーズアウトは初速が最大で、足首 z 速度が 0→0.9m/s に跳んでいた＝実測）を静止側から 0.08f でブレンドして速度を連続にする。f=0.55 の位置・リフトと 0.63 以降の軌道は不変
+        const BIAS = -0.05; // 骨盤は支持足の着地位置より5cm手前（歩行の平均位置。膝の自然な曲がりを決める）
+        const pzSwing = joinPrev.z, pzStep = lead.z + BIAS;
+        const trEnd = k === STAIR_STEPS - 1 ? 0.48 : 0.55; // 骨盤の体重移動は後ろ足が揃えに離地する f=0.55 までに完了させる（移動の途中で支持足が1本になると、骨盤が支持足首から大きく外れたままになるため。骨盤側の調整で、足の着地・揃えのタイミングは参考版のまま）。最終サイクルは区間出口のブレンド（残り0.4s＝f≈0.56〜）に上昇を食われないよう、さらに早めに完了させる
+        const uT = f < 0.35 ? 0 : smooth01((f - 0.35) / (trEnd - 0.35));
+        flightPZ = pzSwing + (pzStep - pzSwing) * eTB((f - 0.35) / (trEnd - 0.35));
+        const ankY0 = prev.top + ANKLE_Y, ankY1 = lead.top + ANKLE_Y;
+        const pyStart = k === 0 ? anchorH(ankY0, 0) : anchorH(ankY0, BIAS);
+        const pyAnchor1 = anchorH(ankY1, BIAS);
+        // 着地の体重受けの沈み: 担当者（荷物あり）は重さで深くし、上りは戻りをゆっくりにする（沈み込みは f=0.52 まで、回復は f=0.92 まで引く）。荷物なしでは従来の深さ・形のまま
+        const kgDipB = Math.min(2.2, 1 + loadKg * 0.035); // 合計32kg→×2.12（上り 0.008→0.017）
+        let dipAmt;
+        if (isDown) dipAmt = 0.02 * Math.min(1.9, 1 + loadKg * 0.028) * Math.sin(Math.PI * clamp01((f - 0.5) / (k === STAIR_STEPS - 1 ? 0.18 : 0.45))); // 下りは着地の沈み込み（最終サイクルは体重移動の終了で閉じ、到着段の支持膝の伸び切りを食わない）
+        else if (loadKg > 0) { const dD = 0.008 * kgDipB; dipAmt = f < 0.52 ? dD * smooth01((f - 0.35) / 0.17) : dD * (1 + Math.cos(Math.PI * clamp01((f - 0.52) / 0.40))) / 2; } // 上り・荷物あり: smooth01 で沈み込み（端点の傾き0）、raised-cosine でゆっくり回復（両端の傾き0、f=0.92 で 0 に戻る）
+        else dipAmt = 0.008 * Math.sin(Math.PI * clamp01((f - 0.35) / 0.35)); // 上り・荷物なしは従来どおり
+        if (f < 0.35) flightPY = pyStart;
+        else if (f < 0.93) flightPY = smin(pyStart + (pyAnchor1 - pyStart) * eTB((f - 0.35) / 0.58), capH(ankY1, lead.z, flightPZ), 0.01); // 高さの上昇だけは揃え足が着く f=0.93 まで延ばす（z の体重移動は 0.55 完了のまま＝単脚支持のバランス維持）。上昇を 0.55 で終えると、上昇中に下段へ残る揃え足が IK 到達限界（0.999·legH）を超えて引きずられ、離地後にクランプが外れて足首速度が −0.07→+2.65m/s に跳んだ（実測）。参考版も上昇は f≈0.95 まで掛ける設計で、支持膝の伸び切りは 0.93 の到達値で従来どおり出る
+        else flightPY = smin(pyAnchor1, capH(ankY1, lead.z, pzStep), 0.01); // 中間ブランチと同じ smin で受ける（Math.min だと smin のアンダーシュートぶん最大2.5mmの位置ステップが f=0.93 で出て骨盤・膝が毎段跳んでいた＝実測）
+        flightPY -= dipAmt;
+        riseFloat = k + uT;
+        flightPhase = (k + f) * Math.PI * 2;
+        phaseStart = 0; phaseEnd = STAIR_STEPS * Math.PI * 2;
+        support = f < 0.35 ? [1, 0] : f < 0.93 ? [1 - uT, uT] : [0.35, 0.65];
+        airborne = [f >= 0.55 && f < 0.93, f < 0.35];
+        ank = [ankle(0, p0.z, p0.top, p0.lift), ankle(1, p1.z, p1.top, p1.lift)];
+    } else {
+        // ===== 交互足（参考版の骨格＋当方版の骨盤高さ） =====
+        // 足は参考版のイベント駆動: 着地・離地を時刻で決め、離地前は踵が浮き（ヒールレイズ）、スイングは最小時間曲線＋円弧、着地手前は段面ランプ＋クリアランスで足裏を守る。腰の z も参考版どおりスケジュールの勾配フローを進み、着地した前足より手前を通るオフセット ZC を区間端で出し入れする
+        // 骨盤の高さだけは当方版: 接地足の「到達アンカー」（足首から脚の到達ぶん上）を、最新の着地足へ重みを移しながらブレンドする。支持膝の伸展サイクル（着地で曲がる→持ち上げで伸びる）が当方版と同等に出るための調整で、到達係数は A 用に少しだけ伸ばし側に振ってある（骨格側の定数 AT は参考値のまま）
+        const AT = { T: 0.88, L0: 0.338, SW: 0.72, HR: 0.31, R: 0.074, ZL: 0.058, RISE: 0.58, ARC: 0.035, ZC: -0.284, BOB: 0.0035, BPH: 2.294, CLR: 0.03 };
+        const T = AT.T, PRE = 0.8, LIM = STAIR_STEPS + 1;
+        const tm = localT - PRE;
+        const nStep = s => s < 0 ? { z: -0.15 - 0.13 * (-1 - s), top: 0 } : { z: (s + 0.5) * STAIR_D + AT.ZL + 0.01 + (stepVary(s * 7 + 13) * 0.028 - 0.008), top: Math.min(s + 1, STAIR_STEPS) * STAIR_H }; // 着地は元々 ZL ぶん奥寄り。揃え足と同じ現実寄せ（2026-11-20）: 基準 +1cm 奥へ、ばらつきは段鼻側を絞った非対称（−0.8〜+2.0cm、旧 ±2.0cm）
+        const hLoc = z => z < 0 ? 0 : (Math.min(STAIR_STEPS - 1, Math.floor(z / STAIR_D)) + 1) * STAIR_H;
+        const rampLoc = z => { const h0 = hLoc(z); if (hLoc(z + 0.12) <= h0) return h0; let lo = 0, hi = 0.12; for (let it = 0; it < 6; it++) { const mid = (lo + hi) / 2; if (hLoc(z + mid) > h0) hi = mid; else lo = mid; } const u = Math.max(0, 1 - hi / 0.12); return h0 + (hLoc(z + 0.12) - h0) * (u * u * (3 - 2 * u)); };
+        const mj = u => { u = clamp01(u); return u * u * u * (10 - 15 * u + 6 * u * u); };
+        const smax = (a, b, kk) => { const s = (a + b + Math.sqrt((a - b) * (a - b) + kk * kk)) / 2; const dq = (a - b) / kk; return s - (kk / 2) * Math.exp(-dq * dq); }; // 素の smooth-max は a=b で +kk/2（=1cm）浮くバイアスがあり、着地直前に足が最大1cm浮き上がって接地ブランチへの切替で1cm落ちるステップになっていた（実測10.2mm）。a≈b でのみ効くガウス補正でバイアスを消す（遠方では補正≈0、微分も連続）
+        const tl = s => (s + AT.L0) * T;
+        const footAt = f => {
+            let s0 = Math.floor(tm / T - AT.L0);
+            if ((((s0 - f) % 2) + 2) % 2 !== 0) s0 -= 1;
+            if (s0 > LIM) s0 = LIM - ((((LIM - f) % 2) + 2) % 2);
+            const a = nStep(s0), b = nStep(s0 + 2);
+            const tLift = tl(s0 + 2) - AT.SW * T;
+            if (tm < tLift || s0 + 2 > LIM) {
+                const rz = AT.R * smooth01((tm - (tLift - AT.HR * T)) / (AT.HR * T));
+                return { z: a.z, y: a.top + ANKLE_Y + rz, air: false, s0: s0 };
+            }
+            const u = (tm - tLift) / (tl(s0 + 2) - tLift);
+            const y0 = a.top + ANKLE_Y + AT.R, y1 = b.top + ANKLE_Y;
+            const z = a.z + (b.z - a.z) * mj(u);
+            const y = y0 + (y1 - y0) * smooth01(u / AT.RISE) + AT.ARC * Math.sin(Math.PI * u);
+            const env = Math.min(rampLoc(z), b.top) + ANKLE_Y + AT.CLR * (1 - smooth01((u - 0.65) / 0.35));
+            return { z: z, y: smax(y, env, 0.02), air: true, s0: s0 };
+        };
+        const fs = [footAt(0), footAt(1)];
+        ank = [0, 1].map(i => new THREE.Vector3(x + cosY * (i === 0 ? -1 : 1) * torsoW * 0.25, baseY + fs[i].y, flightZ0 + fs[i].z));
+        airborne = [fs[0].air, fs[1].air];
+        support = [0, 1].map(i => airborne[i] ? 0 : (airborne[1 - i] ? 1 : 0.5));
+        const durA = sched[segF + 1][0] - sched[segF][0];
+        flightPZ = zBody + AT.ZC * Math.min(smooth01(localT / 1.1), smooth01((durA - localT) / 1.1));
+        const anchorHA = (ankY, dzOff) => ankY + Math.sqrt(Math.max(legH * legH * 0.999 - dzOff * dzOff, 0.0004)) * 0.9985 - 0.005; // A用の到達アンカー（当方版 anchorH の考え方。係数だけ A の流れに合わせて調整）。股関節は骨盤中心より数mm上・前にあり、その分だけ実距離が伸びてIKクランプ（0.999）を超え、支持足の足首が数mm浮いた（footflat実測）ため、5mmの余裕を引く
+        const ankAbs = i => { const ns = nStep(fs[i].s0); return { y: baseY + ns.top + ANKLE_Y, z: flightZ0 + ns.z }; };
+        const planted = [0, 1].filter(i => !airborne[i]);
+        if (planted.length === 2) {
+            const iNew = fs[planted[0]].s0 > fs[planted[1]].s0 ? planted[0] : planted[1];
+            const iOld = 1 - iNew;
+            const aN = ankAbs(iNew), aO = ankAbs(iOld);
+            const wNew = eT((tm - tl(fs[iNew].s0)) / 0.22); // 体重の移行は、後ろ足の離地（着地の約0.246s後）までに必ず完了させる（未完了のまま離地すると支持足アンカーへ跳ぶ）。イーズは骨盤zと同じ eT でピーク速度を抑える
+            flightPY = anchorHA(aO.y, flightPZ - aO.z) * (1 - wNew) + anchorHA(aN.y, flightPZ - aN.z) * wNew;
+        } else if (planted.length === 1) {
+            const aP = ankAbs(planted[0]);
+            flightPY = anchorHA(aP.y, flightPZ - aP.z);
+        } else flightPY = legH + baseY;
+        flightPY += AT.BOB * Math.sin(2 * Math.PI * tm / T + AT.BPH);
+        if (loadKg > 0) { // 持つ側だけ（それぞれ持ち）: 着地のたびの体重受けの沈み。深さ・回復時間とも荷物の重さで増える。後続（loadKg=0）には付けない
+            const sLand = Math.floor(tm / T - AT.L0); // 直近に着地したステップ
+            const uDip = (tm - (sLand + AT.L0) * T) / (0.30 + loadKg * 0.004); // 回復時間: 12kg→0.348s、22kg→0.388s
+            if (uDip >= 0 && uDip < 1) { const sd = Math.sin(Math.PI * uDip); flightPY -= (0.004 + loadKg * 0.00045) * sd * sd; } // sin² パルス（両端の傾き0で滑らか）。深さ: 12kg→0.94cm、22kg→1.39cm
+        }
+        riseFloat = Math.max(0, Math.min(STAIR_STEPS, tm / T));
+        flightPhase = Math.PI * (tm / T + 0.38);
+        phaseStart = Math.PI * (-PRE / T + 0.38); phaseEnd = Math.PI * ((durA - PRE) / T + 0.38);
+    }
+    return { ank, support, airborne, flightPZ, flightPY, riseFloat, flightPhase, phaseStart, phaseEnd, baseY };
+};
+if (seg === 1 || seg === 3) {
+    const localT = Math.max(0, tt - sched[seg][0]);
+    const F = computeFlight(seg, localT);
+    let ank = F.ank, flightPZ = F.flightPZ, flightPhase = F.flightPhase;
+    const support = F.support, airborne = F.airborne, phaseStart = F.phaseStart, phaseEnd = F.phaseEnd;
+    const baseY = F.baseY;
+    person.position.y = baseY + STAIR_H * F.riseFloat;
+    const flightGrpY = F.flightPY - person.position.y;
+    // 区間境界（平地との接続）: 出口側だけ平地ポーズへブレンドする。入口側は平地区間の終端でフライト開始ポーズへ事前収束済み（平地側の処理を参照）のためブレンドしない
+    // ——入口ブレンドを残すと、開始ポーズ（支持足の真上・段下のスタンス）へ戻す動きが第1スイング（0.315s）と重なり、骨盤が最大15cm後退・先行足が上がらず滑る「1段目だけ足踏み」になっていた（実測）。事前収束で k=0 も k>=1 と全く同じ連動になる
+    const fp = flatPose();
+    const dur = sched[seg + 1][0] - sched[seg][0];
+    const BL = isB ? 0.4 : 0.8; // 交互足の出口ブレンドは参考版の0.8s（揃え足は従来の0.4s）
+    const w = smooth01((dur - localT) / BL);
+    if (w < 1) {
+        ank = blendAnkles(fp.ankles, ank, w);
+        person.bodyGroup.position.y = fp.grpY + (flightGrpY - fp.grpY) * w;
+        person.position.z = zBody + (flightPZ - zBody) * w;
+        // 位相差は区間の端（出口なら localT=dur）を基準に固定して測る。fp.phase は flightPhase より速く回るため、その場で包んだ位相差はブレンド中に ±π を跨いで 2πw だけ反転し、sin(ph) が1フレームで跳ぶ（＝体のヨー/ピッチが跳んで持ち手の肘が跳ぶ。実測で特定）。端で包んだ差に、端からの両位相の増分を足す形なら連続になる
+        const fpRate = Math.PI * 2 / flatCyc;
+        const anchorT = dur;
+        const anchorFlight = phaseEnd; // 位相アンカーは各歩容が自分の終了位相を持つ（交互足は参考版の位相オフセット込み）
+        const anchorFP = (sched[seg][0] + anchorT) * fpRate;
+        let dph = anchorFlight - anchorFP;
+        dph = Math.atan2(Math.sin(dph), Math.cos(dph)) + (flightPhase - anchorFlight) - (fp.phase - anchorFP);
+        flightPhase = fp.phase + dph * w;
+    } else {
+        person.bodyGroup.position.y = flightGrpY;
+        person.position.z = flightPZ;
+    }
+    // 足首目標は真下の段面より下げない（蹴り出しのヒールレイズで足首が段鼻を越えた瞬間、段面の段差ぶん沈んで見えるのを防ぐ）
+    ank = ank.map(a => { const mY = heightAt(a.z) + ANKLE_Y; return a.y < mY ? new THREE.Vector3(a.x, mY, a.z) : a; });
+    return { ankles: ank, phase: flightPhase, walkAmt: walkAmt0, support, airborne };
+}
+// 平地（アプローチ／踊り場／上の階）
+const groundY = seg === 0 ? 0 : (seg === 2 ? STAIR_H * STAIR_STEPS : TOP_H);
+const arrived = seg >= 4 && tt >= sched[5][0];
+if (arrived) {
+person.position.y = groundY;
+person.bodyGroup.position.y = legH;
+// 到着直後は歩行ポーズから両足を揃えた静止ポーズへ0.45sで収める（境界の瞬間移動防止）。腕は walkAmt の減衰で静止へ
+const fpA = flatPose();
+const bw = smooth01((tt - sched[5][0]) / 0.45);
+const stand = [ankle(0, zBody, groundY, 0), ankle(1, zBody, groundY, 0)];
+return { ankles: blendAnkles(fpA.ankles, stand, bw), phase: sched[5][0] * Math.PI * 2 / flatCyc, walkAmt: walkAmt0 * (1 - smooth01((tt - sched[5][0]) / 0.45)), support: [0.5, 0.5], airborne: [false, false] };
+}
+const fpG = flatPose();
+person.position.y = groundY;
+person.bodyGroup.position.y = fpG.grpY;
+const airG = [0, 1].map(i => (fpG.ankles[i].y - rampHeightAt(fpG.ankles[i].z) - ANKLE_Y) > 0.02);
+const supG = [0, 1].map(i => airG[i] ? 0 : (airG[1 - i] ? 1 : 0.5));
+// 事前収束: 次がフライト区間なら、その終端でフライト開始ポーズ（computeFlight(seg+1, 0)）へ滑らかに寄せ切る。フライト側で入口ブレンドをすると開始ポーズへの引き戻しが第1スイングと重なって「1段目だけ足踏み」になるため、寄せは平地側で済ませ、フライトの k=0 を k>=1 と同じ連動にする。位相も開始位相へ包んで寄せる
+if (seg === 0 || seg === 2) {
+const segEnd = sched[seg + 1][0];
+const BLpre = Math.min(isB ? 0.4 : 0.8, segEnd - sched[seg][0]); // 交互足の踊り場（0.65s）など区間がブレンド幅より短い場合は区間長に合わせる
+const rem = segEnd - tt;
+if (rem < BLpre) {
+const wPre = smooth01(1 - rem / BLpre);
+const F0 = computeFlight(seg + 1, 0);
+const ankC = blendAnkles(fpG.ankles, F0.ank, wPre);
+person.bodyGroup.position.y = fpG.grpY + (F0.flightPY - F0.baseY - fpG.grpY) * wPre;
+person.position.z = zBody + (F0.flightPZ - zBody) * wPre;
+const fpRate = Math.PI * 2 / flatCyc;
+const dphT = Math.atan2(Math.sin(F0.phaseStart - segEnd * fpRate), Math.cos(F0.phaseStart - segEnd * fpRate));
+return { ankles: ankC, phase: fpG.phase + dphT * wPre, walkAmt: walkAmt0, support: supG, airborne: airG };
+}
+}
+return { ankles: fpG.ankles, phase: fpG.phase, walkAmt: walkAmt0, support: supG, airborne: airG };
+}
+function applyStairs(t) {
+const tt = ((t % CYCLE_T) + CYCLE_T) % CYCLE_T;
+const down = layout.dir === 'down';
+const te = down ? (CYCLE_T - tt) : tt; // 下りは上りサイクルの逆再生。tt=0 では te=CYCLE_T（上階）になるよう % で潰さない
+const side = layout.hold === 'h';
+const one = layout.pattern === 'one';
+const s = (down ? -1 : 1); // レーンは左側通行で固定: 進行方向を向いた左手側が +x（上り=+xレーン／下り=−xレーン）
+const carrierP = layout.carrier === 'A' ? personA : personB;
+const freeP = layout.carrier === 'A' ? personB : personA;
+const gripLocalOf = cObj => side ? cObj.userData.sideGripLocal : cObj.userData.topGripLocal;
+const bottomExtentOf = cObj => side ? cObj.userData.dims.D * 0.505 : cObj.userData.dims.H / 2 + WHEEL_DROP;
+const dirScale = down ? 0.5 : 1;
+const idxFor = worldSideSign => (down ? (worldSideSign > 0 ? 0 : 1) : (worldSideSign > 0 ? 1 : 0)); // ワールド側の手のインデックス
+const worldSideOf = armIdx => (down ? (armIdx === 0 ? 1 : -1) : (armIdx === 1 ? 1 : -1));
+// レーン配置: 片方=選んだ側のレーン内で前後、それぞれ=選んだ側に寄せて横並び（ケースは各自の外側）
+const laneX = {}, outerSign = {};
+if (one) {
+laneX.A = s * 0.95; laneX.B = s * 0.95;
+} else {
+const wallP = s < 0 ? 'B' : 'A', centerP = s < 0 ? 'A' : 'B';
+laneX[wallP] = s * 1.20; laneX[centerP] = s * 0.62;
+outerSign[wallP] = s; outerSign[centerP] = -s;
+}
+personA.position.x = laneX.A; personB.position.x = laneX.B;
+personA.rotation.y = down ? Math.PI : 0;
+personB.rotation.y = down ? Math.PI : 0;
+const segs = {}, feet = {}, tOf = {}, schedOf = {};
+lastFeet = feet;
+if (one) {
+segs[carrierP.userData.role] = schedSeg(SCHED_B, te);
+segs[freeP.userData.role] = schedSeg(SCHED_A, te);
+tOf[carrierP.userData.role] = te; schedOf[carrierP.userData.role] = SCHED_B;
+tOf[freeP.userData.role] = te; schedOf[freeP.userData.role] = SCHED_A;
+feet[carrierP.userData.role] = stairFeet(carrierP, SCHED_B, segs[carrierP.userData.role], te, true, down, layout.specA.kg + layout.specB.kg); // 担当者は揃え足・ゆっくり。両手に両ケース＝合計kg
+feet[freeP.userData.role] = stairFeet(freeP, SCHED_A, segs[freeP.userData.role], te, false, down, 0); // 後続は荷物なし（重量感を付けない）
+} else {
+const teA = Math.min(te + 0.55, CYCLE_T - 0.001); // それぞれ: Aは少し後ろから（段差の都合の前後差）
+segs.B = schedSeg(SCHED_A, te);
+segs.A = schedSeg(SCHED_A, teA);
+tOf.B = te; schedOf.B = SCHED_A; tOf.A = teA; schedOf.A = SCHED_A;
+feet.B = stairFeet(personB, SCHED_A, segs.B, te, false, down, layout.specB.kg); // それぞれ持ち: 自分のケースのkg
+feet.A = stairFeet(personA, SCHED_A, segs.A, teA, false, down, layout.specA.kg);
+}
+// 荷重（ケースの実kg）→ 体の傾きと肩の下がり。kgArm[role][armIdx]（armIdx 1=左手/+x側, 0=右手）
+const kgArm = { A: [0, 0], B: [0, 0] };
+if (one) {
+kgArm[carrierP.userData.role][idxFor(1)] += layout.specA.kg;
+kgArm[carrierP.userData.role][idxFor(-1)] += layout.specB.kg;
+} else {
+kgArm.A[idxFor(outerSign.A)] += layout.specA.kg;
+kgArm.B[idxFor(outerSign.B)] += layout.specB.kg;
+}
+const loadTilt = {};
+[personA, personB].forEach(p => {
+const kg = kgArm[p.userData.role], kgTot = kg[0] + kg[1], kgDiff = kg[1] - kg[0];
+// 横傾き: 重い手の反対側へ体幹が傾く（片手荷物のカウンターバランス）。10kg差≈1.5°、上限4°
+const roll = Math.max(-0.07, Math.min(0.07, kgDiff * 0.0026));
+let pitch = 0;
+if (one && p === carrierP) pitch = Math.max(0.02, Math.min(0.12, 0.03 + kgTot * 0.0022)); // 両手持ちは合計kgで前傾（20kg≈4°、40kg≈7°）
+else if (kgTot > 0) pitch = kgTot * 0.0012; // 片手持ちの前傾は控えめに加算
+loadTilt[p.userData.role] = { pitch: pitch, roll: roll, kgTot: kgTot };
+[0, 1].forEach(i => { // 持つ側の肩が重さで下がる（最大2.8cm）
+p.arms[i].anchor.position.y = p.userData.torsoH - p.userData.torsoW * 0.15 - Math.min(0.028, kg[i] * 0.00115);
+});
+});
+[personA, personB].forEach(p => {
+const role = p.userData.role, onStairs = segs[role] === 1 || segs[role] === 3;
+// 階段らしさ（前傾の増加分）は区間境界で段差にせず、フライト入口・出口の0.5sで滑らかに出し入れする（境界の瞬間に体が前のめりに跳ぶと、特に1段目で「コケそう」に見える）
+let stairProx = 0;
+if (onStairs) { const scP = schedOf[role], ltP = tOf[role] - scP[segs[role]][0], durP = scP[segs[role] + 1][0] - scP[segs[role]][0]; stairProx = Math.min(smooth01(ltP / 0.5), smooth01((durP - ltP) / 0.5)); }
+const ph = feet[role].phase;
+const heavy = one && p === carrierP; // 両手持ちは体の回旋を小さめに
+const lt = loadTilt[role];
+p.bodyGroup.rotation.x = (one ? (p === carrierP ? lt.pitch : 0.015 + 0.025 * stairProx) : 0.03 + 0.04 * stairProx + lt.pitch) + (0.01 + 0.01 * stairProx) * Math.sin(ph); // 前傾（荷重ぶん含む、階段ぶんは stairProx で出し入れ）＋周期に合わせた小さなピッチ揺れ
+p.bodyGroup.rotation.y = Math.sin(ph) * (heavy ? 0.026 : 0.052); // 骨盤のヨー回旋（±3°、両手持ちは±1.5°）
+p.bodyGroup.rotation.z = Math.sin(ph + 0.5) * (heavy ? 0.008 : 0.014) + lt.roll; // ロールの周期成分は小さく（±0.5〜0.8°。左右の揺れに見える成分を消す）。lt.roll は荷重の静的な傾きで別物 // 骨盤のロール（±2°、両手持ちは±1°）＋荷重の横傾き
+p.bodyGroup.position.x = Math.sin(ph) * 0.006; // 重心の左右移動は最小限（±6mm）
+});
+// ケース配置: 持ち方（縦/横）でグリップ位置と最下点が変わる。揺れは手の動きへ位相遅れで追従、下りは小さく
+caseAObj.visible = true; caseBObj.visible = true;
+caseAObj.userData.sideGripGroup.visible = side;
+caseBObj.userData.sideGripGroup.visible = side;
+hideTelescopic(caseAObj); hideTelescopic(caseBObj);
+const holders = {}; // case role -> {person, armIdx, cObj}
+const placeCase = (cObj, key, holder, armIdx, sign) => {
+const ph = feet[holder.userData.role].phase;
+const kgCase = key === 'A' ? layout.specA.kg : layout.specB.kg; // このケース自体の重さ（振り子の遅れ・着地の沈みの効きを決める）
+// 振り子応答: 基本波（位相遅れ）に2倍波を混ぜて二次遅れ・減衰の残響らしくする。遅れ・振幅はケースの重さで増える（重いほど遅れて大きく揺れる＝慣性。12kg→遅れ1.07rad、22kg→1.25rad）
+const lagW = 0.85 + kgCase * 0.018;
+const sway = Math.sin(ph - lagW) + 0.35 * Math.sin(2 * ph - 2 * lagW - 0.2);
+const fSign = down ? -1 : 1; // 進行方向（ワールドzの符号）
+let caseZ = holder.position.z - (side ? 0.15 : 0.24) + 0.021 * (1 + kgCase * 0.012) * sway * dirScale; // 下の段側（ワールド−z）へ寄せ、ケース全体が体の正面より前へ出ない位置にする。縦持ちの寄せ量は 0.20→0.24（2026-11-20 追加: 現実の持ち位置に寄せる。ワールド−z への寄せは、上りでは「腕が肩から真下に垂れてケースが脚のラインより後ろ」、下りでは「ケースが少し前寄り」という現実の出方に両方向で一致する。実測: 足首中点−ケース中心の中央値 23.1→27.1cm）（72cm級のケースは前後長が踏面より長く、中心を真横に置くと前半分が上の段に乗り上げて持ち上げ補正＝肘の深曲がりが常時入るため。ケースは脚の横〜後ろに沿う）。横持ちはグリップがケース中心にあるため、寄せすぎると肩から届かなくなる（小柄＋Lで実測）ので −0.15 に留める。グリップの振れ補正で後から調整する
+// 横位置: 縦持ちは体の真横にくっつける（体の中心＋脚の外側＋ケース半厚＋隙間2cm）。横持ちは従来の固定オフセット
+let cx;
+if (side) cx = holder.position.x + sign * (one ? 0.46 : 0.42);
+else {
+const bodyCx = holder.position.x + Math.cos(holder.rotation.y) * holder.bodyGroup.position.x;
+cx = bodyCx + sign * (holder.userData.torsoW * 0.45 + cObj.userData.dims.D * 0.505 + 0.02);
+}
+cObj.rotation.order = 'YXZ';
+// 段面のランプ先読み（段鼻の手前0.16mから次の段面へ滑らかにつなぐ）。caseZに対して連続なので、ケース高さが段鼻で跳ばない。先読みが広い（0.12m）と段鼻のはるか手前から段1つ分（0.16m）余計に持ち上げて肘が深く曲がり、狭い（0.05m）と持ち上げ速度が上限に張り付いて肘が高速で曲がる（フレーム跳び）。0.16mでは補正の上昇率が最大でも約0.55m/sに収まり、速度上限1.0m/sの範囲で余裕を持って追従でき、肘の高速な曲がり（フレーム跳び）も抑えられる
+const profRampAt = z => { // 「高い段」への滑らかな先読みプロファイル（zに対して連続）。階段はワールドでは常に +z 側が高いので、先読み方向は進行方向でなく +z 固定にする: 下りで −z（常に低い側）を見ると段面が階段関数になり、段鼻を越えた瞬間に持ち上げ目標が落ちてケースが落下し、持ち手の肘が跳ぶ（実測で特定）
+const h0 = heightAt(z);
+// 窓（0.45m）の中にある段鼻を最大2つまで合成する。窓が踏面（0.32m）より長いと、段鼻の直上でも次の段へのランプが途中から始まってしまい、単純な形では段鼻ごとに不連続になる（実測+3.3cmの跳び）。各段鼻への寄与（段鼻で上の段面に一致し、窓の端で下の段面に一致）を逐次ブレンドすると連続になる
+let prof = h0, zz = z, hh = h0;
+for (let n = 0; n < 2; n++) {
+const dist0 = zz - z;
+if (dist0 >= 0.45 || heightAt(zz + (0.45 - dist0)) <= hh) break;
+let lo = 0, hi = 0.45 - dist0;
+for (let it = 0; it < 10; it++) { const mid = (lo + hi) / 2; if (heightAt(zz + mid) > hh) hi = mid; else lo = mid; } // 二分探索10回で分解能0.3mm
+const hN = heightAt(zz + hi + 0.004);
+const u = Math.max(0, 1 - (dist0 + hi) / 0.45);
+prof = prof + (hN - prof) * (u * u * (3 - 2 * u)); // 段鼻ごとに逐次ブレンドする（maxで重ねると第2段鼻の基底が一段上の高さになり、窓に入った瞬間に跳ぶ）
+zz = zz + hi + 0.004; hh = hN;
+}
+return prof; // 先読み0.45m: 0.30mでは踊り場から次の階段へ入る所で持ち上げ率が約0.7m/sに達し、肩の動きと重なって持ち手の肘が高速で曲がった（実測）。0.45mで率は約2/3になる。窓を 0.62m まで広げる案は、2段先の段面まで見てケースを吊り上げすぎ、下り flight2 で肘が 114.6° まで深曲がりしたため不採用（実測）。持ち上げ率の平滑化は下の carryLift（位相ベースの事前持ち上げ）が担う
+};
+// ケースはハンドルから吊り下がってほぼ垂直を保つ（段の斜面に合わせて傾けない。実際に提げたケースは重力で垂直に垂れる）。残る傾きは歩行の振り子揺れ（数度）のみ。底が水平になる分、段とのクリアランスは下の持ち上げ補正で確保する
+if (side) cObj.rotation.set(-Math.PI / 2 + 0.02 * sway * dirScale, 0, 0.03 * sway * dirScale); // 横持ち: 高さHが進行方向に沿い、長辺グリップが上に来る倒し姿勢
+else cObj.rotation.set(0.02 * (1 + kgCase * 0.008) * sway * dirScale, Math.PI / 2, 0.035 * (1 + kgCase * 0.008) * sway * dirScale); // 縦持ち: ヨー90°で幅Wが進行方向に沿い、広い面(W×H)が体の側面（カメラ側）を向く。ほぼ垂直に吊り下がる。傾きの振幅も重さで少し増える
+const gripOff = gripLocalOf(cObj).clone().applyEuler(cObj.rotation); // 回転を決めた後に取る（前フレームの回転で計算するとピッチと相互作用して位置が跳ぶ）
+if (!side) caseZ -= gripOff.z; // 揺れでグリップが進行方向へ振れた分だけ本体を戻し、グリップが体の真横に来るようにする（肩→グリップの前後距離が膨らんで腕が届かなくなるのを防ぐ）
+// 高さ: 段プロファイルではなく、手から自然に吊り下がる位置で決める（肩→グリップの距離が、肘が約20°曲がる長さになる高さ（13°では腕がほぼ伸び切ってIKの特異点に近く、ケースの小さな上下で肘角が跳ねた））
+const armH = holder.arms[armIdx];
+const shW = new THREE.Vector3(); armH.anchor.getWorldPosition(shW);
+const hangAng = side ? 13 : 20 - Math.min(3.5, kgCase * 0.16); // 縦持ちの吊り下げ肘角: 重いケースほど腕が重さで引かれて伸び気味になる（20°→22kgで16.5°、12kgで18.1°）。横持ちはグリップの水平距離（hdH）が大きく、20°では hangD < hdH になって手が届かなくなる組み合わせ（小柄＋L＋横持ち）があるため、横持ちだけ従来の13°（≒腕スパン）を使う
+const hangD = Math.sqrt(armH.upperLen * armH.upperLen + armH.foreLen * armH.foreLen + 2 * armH.upperLen * armH.foreLen * Math.cos(hangAng * Math.PI / 180));
+const hdH = Math.hypot(cx - shW.x, (caseZ + gripOff.z) - shW.z);
+let caseY = shW.y - Math.sqrt(Math.max(hangD * hangD - hdH * hdH, 0.04)) - gripOff.y;
+// 事前持ち上げ（carryLift）: 揃え足スケジュールの持つ人は、段を上がる直前（ケースの前進が止まっている位相）からケースを滑らかに持ち上げておき、体重移動でケースが速く前進する位相では既に高さが足りているようにする。骨盤の上昇を着地（f=0.93）まで延ばした結果、肩の上昇が持ち上げを補助しなくなり、不足分を liftCorr が前進中に一気に補う形になって持ち手の肘が 14°/フレームで跳んだ（実測: liftCorr は f=0.40→0.55 で 0.045→0.177m）。不足の立ち上がりを位相の早い側へ移すことで、liftCorr は残差だけを担う。振幅 0.11m は実測ピーク（0.177m）の約6割で、残差の立ち上がりはランプ後半の緩い部分に収まる。持ち上げ過ぎの位相ではクリアランスが目標より一時的に大きくなる（＝段の手前でケースを高く構える動きになる）
+{ const segC = segs[holder.userData.role], scC = schedOf[holder.userData.role];
+if ((segC === 1 || segC === 3) && scC === SCHED_B) { const ltC = tOf[holder.userData.role] - scC[segC][0], fC = (ltC % 0.9) / 0.9;
+let WC; if (fC < 0.05) WC = 1 - smooth01((fC + 0.42) / 0.44); else if (fC < 0.42) WC = smooth01((fC - 0.05) / 0.37); else if (fC < 0.58) WC = 1; else WC = 1 - smooth01((fC - 0.58) / 0.44); // 立ち上げ [0.05,0.42]（ケース前進がほぼ止まっている間）→保持 [0.42,0.58]（前進・段越し）→解放 [0.58,1.02]（骨盤の上昇が追いつく間。サイクル境界で連続）
+caseY += 0.11 * WC; } }
+// 段に当たる時だけ持ち上げる: 底面の縁をサンプルし、各点が「段面＋2cm」を下回らないよう上限付きで補正する。
+// 段面は段鼻の手前0.16mからランプ状に先読みするので、段鼻を越える瞬間に高さが跳ばない（profRampAt は上で定義）
+const dimsC = cObj.userData.dims;
+const edgeLocal = [];
+if (side) { for (let ly = -dimsC.H / 2; ly <= dimsC.H / 2 + 1e-6; ly += dimsC.H / 12) edgeLocal.push(new THREE.Vector3(0, ly, -dimsC.D * 0.505)); }
+else { // 縦持ちの最下点は「胴体底面（−H/2、全面）」と「キャスター4輪（−H/2−WHEEL_DROP、角の内側0.052の位置だけ）」。以前は全面を車輪底でサンプルしており、底面中央まで車輪の高さで見る分だけ持ち上げが過大になっていた
+for (let lx = -dimsC.W / 2; lx <= dimsC.W / 2 + 1e-6; lx += dimsC.W / 16) edgeLocal.push(new THREE.Vector3(lx, -dimsC.H / 2, 0));
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) edgeLocal.push(new THREE.Vector3(sx * (dimsC.W / 2 - 0.052), -(dimsC.H / 2 + WHEEL_DROP), sz * (dimsC.D / 2 - 0.052)));
+}
+const edgePts = edgeLocal.map(v => { const r = v.clone().applyEuler(cObj.rotation); return { y: r.y, z: r.z }; });
+let pen = -Infinity;
+for (const pt of edgePts) { const pv = profRampAt(caseZ + pt.z) + CLR_TGT + CLR_EXTRA - (caseY + pt.y); pen = pen === -Infinity ? pv : smaxC(pen, pv, 0.004); } // 目標クリアランス CLR_TGT＋底上げ CLR_EXTRA。素の max だと拘束する縁点が切り替わる瞬間に liftCorr の傾きが跳び、ケース高さ→持ち手の肘が毎段小さく跳んでいた（実測: 肘 1.9°/フレーム）ため、平滑 max（smaxC）で畳む（真の max からのはみ出しは最大 ~0.1mm でクリアランスは実質不変）
+let liftCorr = Math.min(smaxC(pen, 0, 0.01), 1.1); // 上限は身長・サイズの全組み合わせで段を越えられるよう大きく取る（必要な分だけ持ち上がる）。0 との合成も平滑 max: 素の max(pen, 0) だと pen が 0 を跨ぐ発動の瞬間に持ち上げ速度が 0→約1.1m/s に跳び、ケース高さと持ち手の肘が毎段跳んでいた（実測: ケースy速度跳び 1.0m/s、肘 1.9°）。平滑化の代償は発動直後の一時的な最大 ~1mm の不足のみ
+// 補正は目標へ即時追従させる（状態を持たない）: 目標はランプ先読みで z に対して連続なので、ケース高さも連続になる。
+// レート制限は状態（前回値）に依存するため、下り（逆再生）では軌跡が変わってグリップが止まり肘角が跳ぶ原因になっていた（実測で特定）。即時追従なら上り・下りで同じ te の姿勢が一致する
+caseY += liftCorr;
+// 着地の瞬間にケースが慣性で沈んで戻る（持つ側の着地に同期した sin² パルス）。深さ・持続はケースの重さで増える。liftCorr の後に引くので、段との余裕が要る場面では下の床クランプが効く。到達限界を超える分は後段の腰落とし安全弁が体の沈みとして受ける（体ごと沈む＝体重受けの見た目になる）
+let dipCase = 0;
+{ const segH = segs[holder.userData.role];
+if (segH === 1 || segH === 3) { const scH = schedOf[holder.userData.role], ltH = tOf[holder.userData.role] - scH[segH][0], durH = scH[segH + 1][0] - scH[segH][0];
+const envH = Math.min(smooth01(ltH / 0.5), smooth01((durH - ltH) / 0.5)); // 出入りブレンド帯では足位相が混ざるので、区間の端 0.5s で滑らかに出し入れする（硬いゲートで切り替えると境界で沈みが段差になり、ケースが落ちて肘が跳ぶ）
+const dAmp = (0.004 + kgCase * 0.00045) * envH; // 深さ: 12kg→0.94cm、22kg→1.39cm
+if (scH === SCHED_B) { const fH = (ltH % 0.9) / 0.9, wH = 0.42 + kgCase * 0.004; if (fH > 0.35 && fH < 0.35 + wH) { const sd = Math.sin(Math.PI * (fH - 0.35) / wH); dipCase = dAmp * sd * sd; } } // 担当者: 先行足の着地（f=0.35）から沈む。持続 wH: 12kg→0.47f、22kg→0.51f
+else { const uA = ((ltH - 0.8) / 0.88 - 0.338) % 1, uP = uA < 0 ? uA + 1 : uA; if (uP < 0.5) { const sd = Math.sin(Math.PI * uP / 0.5); dipCase = dAmp * sd * sd; } } // 交互足: 着地（frac(tm/T)=0.338）から 0.44s かけて沈んで戻る
+} }
+if (dipCase > liftCorr + 0.004) dipCase = liftCorr + 0.004; // 沈みが吊り下げ位置（liftCorr=0 の高さ）を 4mm 以上割り込むと、肩→グリップ距離が吊り下げ長を超えて腕が伸び切り、肘角が特異点付近で跳ぶ（実測: 交互足の着地で liftCorr≈0 の所に沈み 1.2cm が重なり、肘 37°→5.7°・跳び 10.8°/フレーム）。沈みはまず liftCorr を食い、吊り下げ位置からは最大 4mm までとする。段越し中（liftCorr が大きい）では沈みは従来どおり全量効く
+caseY -= dipCase;
+// 肘角の下限（30°）に相当するケース高さの床（交互足の持つ人用）: 着地のたびに骨盤（肩）が速く上がる一方、ケースは段プロファイルに張り付いて取り残されると、腕が伸び切る方向へ肘角が特異点付近を高速で通過する（実測: 交互足の着地で肘 37°→10° が 67ms、跳び 10.8°/フレーム）。ケースが「肘30°で吊るした高さ」より下には行かないようにすると、その局面ではケースが体と一緒に持ち上がる（実際に重いケースを持って段を上がる時の動き）うえ、肘は危険域に入らない。床と吊り下げ位置の差は hdH が同じなら一定なので、切替でもケース速度は連続する
+if (schedOf[holder.userData.role] === SCHED_A) { const hangD30 = Math.sqrt(armH.upperLen * armH.upperLen + armH.foreLen * armH.foreLen + 2 * armH.upperLen * armH.foreLen * Math.cos(30 * Math.PI / 180));
+const floorY30 = shW.y - Math.sqrt(Math.max(hangD30 * hangD30 - hdH * hdH, 0.04)) - gripOff.y;
+caseY = smaxC(caseY, floorY30, 0.025); } // 対象は交互足（SCHED_A）の持つ人だけ: 揃え足（SCHED_B）は肩の上昇が遅く床なしで肘が滑らか（実測で合格）。床は平滑 max（バンド 2.5cm）で、30° の線のはるか手前からケースが肩へ追随し始めて落下が減速するようにする（硬い床・狭いバンドでは落下速度のまま突入して跳びが 6.3°/フレーム残った。実測）
+let trueClear = Infinity;
+for (const pt of edgePts) trueClear = Math.min(trueClear, caseY + pt.y - heightAt(caseZ + pt.z));
+if (dipCase > 0 && trueClear < 0.0105) { caseY += (0.0105 - trueClear); trueClear = 0.0105; } // 沈みで段に触れないための床（最低1.05cm: 全構成スイープの合格ライン +1.0cm を割らないため。0.4cm だった時は h220/L/down で実測 0.41cm まで落ちた）。通常は目標クリアランスの方が先に効く
+cObj.position.set(cx, caseY, caseZ);
+if (key === 'A') { measure.clearCmA = trueClear * 100; measure.liftCorrA = liftCorr; }
+else { measure.clearCmB = trueClear * 100; measure.liftCorrB = liftCorr; }
+holders[key] = { person: holder, armIdx: armIdx, cObj: cObj };
+};
+if (one) {
+placeCase(caseAObj, 'A', carrierP, idxFor(1), 1);
+placeCase(caseBObj, 'B', carrierP, idxFor(-1), -1);
+} else {
+placeCase(caseAObj, 'A', personA, idxFor(outerSign.A), outerSign.A);
+placeCase(caseBObj, 'B', personB, idxFor(outerSign.B), outerSign.B);
+}
+caseGroup.updateMatrixWorld(true);
+// ケースに手が届くよう、必要なら持っている人の腰を落とす（脚IKが追従）
+[personA, personB].forEach(p => {
+const mine = Object.values(holders).filter(h => h.person === p);
+if (!mine.length) return;
+let dropNeed = 0, raiseNeed = 0;
+mine.forEach(({ cObj, armIdx }) => {
+const gripW = cObj.localToWorld(gripLocalOf(cObj).clone());
+const shoulder = new THREE.Vector3(); p.arms[armIdx].anchor.getWorldPosition(shoulder); // 実測の肩位置で判定（近似式だと不足を検出できない）
+const excess = shoulder.distanceTo(gripW) - (p.arms[armIdx].upperLen + p.arms[armIdx].foreLen) * 0.998; // 吊り下げ配置では届くのが前提。到達限界の安全弁としてだけ残す
+if (excess > 0) { if (gripW.y > shoulder.y) raiseNeed = Math.max(raiseNeed, excess * 1.25); else dropNeed = Math.max(dropNeed, excess); } // グリップが肩より上（小さい人が大きいケースを段の上で高く持ち上げた時）は体を伸ばして届かせる
+});
+if (raiseNeed > 0) p.bodyGroup.position.y = Math.min(p.userData.legH * 1.10, p.bodyGroup.position.y + raiseNeed); // 階段では支持脚の伸展で腰が legH を超えるため上限は legH*1.10（legH で切ると腰が一段下がる）
+else if (dropNeed > 0) p.bodyGroup.position.y = Math.max(p.userData.legH * 0.60, p.bodyGroup.position.y - dropNeed);
+});
+stageGroup.updateMatrixWorld(true);
+poseLegWorld(personA, 0, feet.A.ankles[0]); poseLegWorld(personA, 1, feet.A.ankles[1]);
+poseLegWorld(personB, 0, feet.B.ankles[0]); poseLegWorld(personB, 1, feet.B.ankles[1]);
+const gripWA = caseAObj.localToWorld(gripLocalOf(caseAObj).clone());
+const gripWB = caseBObj.localToWorld(gripLocalOf(caseBObj).clone());
+// 標準ポール（外・下・後ろ）は、グリップが肩に近い（深く曲がる）姿勢ではグリップ方向とほぼ平行になり、肘が上・外へ飛び出す。担当者の腕は上り下りとも「下＋後ろ」ポールを明示して肘を体の後ろ下へ逃がす
+const carrierPole = new THREE.Vector3(0, -0.5, -1.0);
+poseArmWorld(holders.A.person, holders.A.armIdx, gripWA, carrierPole);
+poseArmWorld(holders.B.person, holders.B.armIdx, gripWB, carrierPole);
+const heldArms = { A: new Set(), B: new Set() };
+heldArms[holders.A.person.userData.role].add(holders.A.armIdx);
+heldArms[holders.B.person.userData.role].add(holders.B.armIdx);
+[personA, personB].forEach(p => { // 空いた手は対側の脚と逆位相に、肩からの振り子で自然に振る
+[0, 1].forEach(i => {
+if (heldArms[p.userData.role].has(i)) return;
+const ankMidZ = (feet[p.userData.role].ankles[0].z + feet[p.userData.role].ankles[1].z) / 2;
+const contraFwd = (feet[p.userData.role].ankles[i === 0 ? 1 : 0].z - ankMidZ) * Math.cos(p.rotation.y); // 対側脚の前後位置。基準は両足首の中点（歩行中心）: 交互足は骨盤が流れより後ろ（ZC）に常駐するため、骨盤基準だと前方へ飽和して腕が前に張り付く（実測で特定）。足首の実測値なので歩行区間の境界でも連続
+const u0 = ((feet[p.userData.role].phase / (Math.PI * 2)) % 1 + 1) % 1;
+const gzPhase = gaitLeg((i === 0 ? (u0 + 0.5) % 1 : u0) + 0.155, 0.13).z; // 位相ベース: 階段の作り直し後の脚タイミング（スイングは位相の前半55%）に合わせ、同側の脚が前に出る間は腕が後ろへ行くよう位相を組み直した
+const gz = Math.max(-0.115, Math.min(0.115, 0.5 * gzPhase + 0.5 * Math.max(-0.13, Math.min(0.13, contraFwd * 0.8)))); // 実測と位相のブレンドで境界の跳びを半減しつつ位相の遅れを残す
+const target = freeHandTarget(p, i, gz, 0.13, feet[p.userData.role].walkAmt);
+const yaw = p.bodyGroup.rotation.y, ca = Math.cos(-0.8 * yaw), sa = Math.sin(-0.8 * yaw);
+const ox = target.x - p.position.x, oz = target.z - p.position.z;
+target.x = p.position.x + ox * ca + oz * sa;
+target.z = p.position.z - ox * sa + oz * ca;
+poseArmWorld(p, i, target, new THREE.Vector3((i === 0 ? -1 : 1) * 0.30, -0.10, -0.95)); // 肘の逃げは外でなく下＋やや後ろ主体（外へ張り出させない）
+});
+});
+[personA, personB].forEach(p => {
+const isHolder = heldArms[p.userData.role].size > 0;
+// 視線: ワールドでの下向き角 = 体のピッチ + 頭のローカル角（上り下り共通）。階段区間では足元を見る自然な下向き（担当者≈11°／空き手≈13°）、平地ではほぼ水平に。区間への出入りは z の連続関数（prox）で滑らかに
+const bump = (z0, z1) => smooth01((p.position.z - z0 + 0.35) / 0.7) * smooth01((z1 + 0.35 - p.position.z) / 0.7);
+const prox = Math.max(bump(FLIGHT1_Z0, LAND_Z0), bump(FLIGHT2_Z0, TOP_Z0));
+const gazeT = 0.03 + prox * (isHolder ? 0.15 : 0.19);
+p.headParts.rotation.x = gazeT - p.bodyGroup.rotation.x; // 体の傾きぶんを差し引いてワールドの視線角を目標に一致させる
+p.headParts.rotation.z = -p.bodyGroup.rotation.z * 0.7; // ロールも打ち消す
+});
+personA.updateMatrixWorld(true); personB.updateMatrixWorld(true);
+measure.mode = 'stairs';
+measure.loadTilt = loadTilt;
+measure.dir = layout.dir; measure.hold = layout.hold; measure.pattern = layout.pattern; measure.carrier = layout.carrier;
+measure.liftCm = (caseAObj.position.y - bottomExtentOf(caseAObj) - heightAt(caseAObj.position.z)) * 100;
+measure.liftCmB = (caseBObj.position.y - bottomExtentOf(caseBObj) - heightAt(caseBObj.position.z)) * 100;
+measure.handErrStairsMm = limbTipWorld(holders.A.person, holders.A.person.arms[holders.A.armIdx], gripWA).distanceTo(gripWA) * 1000;
+measure.handErrStairsMmB = limbTipWorld(holders.B.person, holders.B.person.arms[holders.B.armIdx], gripWB).distanceTo(gripWB) * 1000;
+measure.stairsCaseBVisible = caseBObj.visible;
+measure.segA = segs.A; measure.segB = segs.B;
+measure.supportA = feet.A.support; measure.supportB = feet.B.support;
+measure.airborneA = feet.A.airborne; measure.airborneB = feet.B.airborne;
+measure.pairCx = (personA.position.x + personB.position.x) / 2;
+viewCenter.set(measure.pairCx, (personA.position.y + personB.position.y) / 2 + 1.05, (personA.position.z + personB.position.z) / 2 + 0.3);
+}
+
+function applyPull(t) {
+const p = t * Math.PI * 2 / 0.95;
+const dist = 0.716 * t, spin = dist / 0.027;
+measure.supportA = null; measure.supportB = null; measure.airborneA = null; measure.airborneB = null;
+if (gridHelper) gridHelper.position.z = -(dist % 0.5);
+measure.gridOffsetZ = gridHelper ? gridHelper.position.z : 0;
+measure.walkDist = dist;
+const one = layout.pattern === 'one';
+const off = 0; // 歩く側の選択は廃止し、ペアは中央を歩く
+const carrierP = layout.carrier === 'A' ? personA : personB;
+const laneOf = person => {
+if (!one) return (person === personA ? 0.38 : -0.38) + off;
+return (person === carrierP ? -0.38 : 0.38) + off;
+};
+// 荷重（引くケースの実kg）→ 後ろへの反り・横傾き・肩の下がり。kgArmP[role][armIdx]（1=左手, 0=右手）
+const kgArmP = { A: [0, 0], B: [0, 0] };
+if (one) {
+kgArmP[carrierP.userData.role][0] += layout.specA.kg;
+kgArmP[carrierP.userData.role][1] += layout.specB.kg;
+} else {
+kgArmP.A[1] += layout.specA.kg;
+kgArmP.B[0] += layout.specB.kg;
+}
+const loadTiltP = {};
+[personA, personB].forEach(person => {
+const x = laneOf(person);
+const bob = (0.5 - 0.5 * Math.cos(2 * p - 1.6 * Math.PI)) * 0.025; // 上下動は歩行周期の2倍周波数（振幅2.5cm）。位相は着地で最小・支持中期で最大に合わせる
+person.position.set(x, 0, 0.30);
+person.bodyGroup.position.y = person.userData.legH + 0.0295 + bob; // 腰は「脚長＋ANKLE_Y−わずかな屈み」ぶん高く取る（足首目標が ANKLE_Y 分高いぶんを補い、支持期に膝がちゃんと伸びるように。従来は legH ちょうどで常時30°超の屈み歩きになっていた）
+const kg = kgArmP[person.userData.role], kgTot = kg[0] + kg[1], kgDiff = kg[1] - kg[0];
+const back = Math.min(0.045, kgTot * 0.0011); // 引く重さに抵抗してわずかに後ろへ反る
+const roll = Math.max(-0.05, Math.min(0.05, kgDiff * 0.002));
+loadTiltP[person.userData.role] = { pitch: -back, roll: roll, kgTot: kgTot };
+[0, 1].forEach(i => { // 引く側の肩が重さで下がる（最大2cm）
+person.arms[i].anchor.position.y = person.userData.torsoH - person.userData.torsoW * 0.15 - Math.min(0.02, kg[i] * 0.001);
+});
+person.bodyGroup.rotation.x = 0.03 + 0.01 * Math.sin(2 * p) - back; // 胴体のピッチ揺れ − 荷重の反り
+person.bodyGroup.rotation.y = Math.sin(p - 0.63) * 0.052; // 骨盤のヨー回旋 ±3°
+person.bodyGroup.rotation.z = Math.sin(p + 0.6) * 0.014 + roll; // 骨盤のロール周期成分は ±0.8° まで弱める ＋ 荷重の静的な横傾き
+person.bodyGroup.position.x = Math.sin(p) * 0.006; // 重心の左右移動は最小限（±6mm）
+person.rotation.y = 0;
+person.headParts.rotation.set(-person.bodyGroup.rotation.x * 0.6, -person.bodyGroup.rotation.y * 0.5, -person.bodyGroup.rotation.z * 0.7); // 頭は体の揺れ（荷重の傾き含む）を打ち消す
+});
+// ケース配置: 伸縮ハンドルはケースの子として固定。ケースを置いてからグリップのワールド座標へ手を合わせる
+const caseJobs = []; // {cObj, holder, armIdx}
+const placeCase = (cObj, holder, armIdx, cx) => {
+cObj.visible = true;
+cObj.userData.sideGripGroup.visible = false;
+showTelescopic(cObj);
+const swayP = Math.sin(p - 0.8) + 0.3 * Math.sin(2 * p - 1.8); // 振り子の二次遅れ
+cObj.rotation.order = 'XYZ';
+if (layout.pullPos === 'side') { // 横につける: 階段の縦持ちと同じ向き（ヨー90°: 幅Wが進行方向に沿い、広い面W×Hが体の側面＝脚の横に沿う）。直立で脚の真横を4輪で転がる
+const dims = cObj.userData.dims;
+const gripWorldY = Math.min(dims.H + WHEEL_DROP + 0.25, holder.userData.height * 0.575); // 横引きの実物どおり伸縮ハンドルをしっかり伸ばす: 目標はケース上面（車輪込み）＋25cm。ただし身長の57.5%を上限にし、グリップが高すぎて肘が上がる／手が届かなくなる構成を避ける
+const topY = Math.max(gripWorldY - (dims.H / 2 + WHEEL_DROP), dims.H / 2 + 0.04); // 極端な構成（小柄＋L等）でもグリップがケース上面より下にはならない
+setTelescopicPose(cObj, topY);
+const sgn = cx >= laneOf(holder) ? 1 : -1; // 持つ人のどちらの側か（呼び出し側の cx の符号で判定）
+const nx = laneOf(holder) + holder.bodyGroup.position.x + sgn * (holder.userData.torsoW * 0.45 + dims.D * 0.505 + 0.02); // 脚の外側＋ケース半厚＋隙間2cm（階段の縦持ちと同じ処方。体の横揺れにも追従）
+cObj.rotation.order = 'YXZ';
+cObj.rotation.set(0.01 * swayP, -sgn * Math.PI / 2, 0.012 * swayP); // ヨー90°。符号は伸縮ハンドル面（ローカル+z）が持つ人側を向く向き（グリップが肩の真下に来て左右対称になる）
+cObj.position.set(nx, dims.H / 2 + WHEEL_DROP, 0.30 + 0.008 * swayP); // グリップが腰の真横に来るよう、ケース中心を人の z に揃える
+cObj.userData.casters.forEach(cg => { cg.rotation.y = Math.PI / 2; }); // 車輪だけ進行方向へ向け直す（ケースを90°回しても転がる向きは前後）
+} else { // 後ろに引く: 35〜40°傾けて体の後ろに離し、低い側の2輪で接地。伸縮量と z はグリップが持ち手の手元（身長×0.52 の高さ・少し後ろ）に来るよう逆算
+cObj.userData.casters.forEach(cg => { cg.rotation.y = 0; });
+const dims = cObj.userData.dims, topZ = cObj.userData.teleHome.topZ, th0 = 0.64;
+const thB = th0 + 0.015 * swayP;
+// 接地時の中心高さは θ0 での最下点を解析的に出す（Box3 実測だと車輪の回転で揺れて伸縮量がフレーム変動するため）。最終の接地は共通ループが実回転で合わせる
+const cos0 = Math.cos(th0), sin0 = Math.sin(th0);
+const minBody = -(dims.H / 2 * 1.01 * cos0 + dims.D / 2 * 1.01 * sin0);
+const minWheel = (-dims.H / 2 - 0.008) * cos0 - (dims.D / 2 - 0.052) * sin0 - cObj.userData.wheelR;
+const minHouse = (-dims.H / 2 - 0.004) * cos0 - (dims.D / 2 - 0.052) * sin0 - (0.02 * cos0 + 0.03 * sin0);
+const cyG = -Math.min(minBody, minWheel, minHouse);
+let topY = (holder.userData.height * 0.49 - cyG + topZ * Math.sin(th0)) / Math.cos(th0); // グリップは肩からの距離が腕の届く範囲に収まる高さ（低すぎると届かず手が浮く）
+topY = Math.max(topY, dims.H / 2 + 0.08);
+setTelescopicPose(cObj, topY);
+cObj.rotation.set(thB, 0, 0.015 * swayP);
+const gripZ = topY * Math.sin(thB) + topZ * Math.cos(thB);
+cObj.position.set(cx, cyG, holder.position.z - holder.userData.height * 0.175 - gripZ + 0.01 * swayP); // ケースを少し後ろに離し、腕が後ろ下へまっすぐ届くように
+// 肩→グリップ距離が腕スパンの94.5%を超える場合は伸縮を伸ばしてグリップを肩へ寄せる（伸び切り位相で肘角が跳ぶのを防ぐ。背の低い側で余裕が消えやすい）。
+// 補正量は設定（持つ人・腕・ケース・身長）が変わった時だけ実測して固定する（毎フレーム変えると伸縮ハンドルの剛体性が崩れるため）
+const cfgKey = holder.userData.role + '|' + armIdx + '|' + dims.H.toFixed(3) + '|' + holder.userData.height.toFixed(3);
+if (cObj.userData.reachKey !== cfgKey) {
+cObj.userData.reachKey = cfgKey;
+holder.updateMatrixWorld(true);
+const armH = holder.arms[armIdx], spanH = armH.upperLen + armH.foreLen;
+const shW = new THREE.Vector3(); armH.anchor.getWorldPosition(shW);
+let topYC = topY;
+for (let it = 0; it < 3; it++) {
+cObj.updateMatrixWorld(true);
+const distG = cObj.localToWorld(cObj.userData.teleGripC.clone()).distanceTo(shW);
+if (distG <= spanH * 0.945) break;
+topYC = Math.min(topYC + (distG - spanH * 0.945) * 0.9, dims.H / 2 + 0.38);
+setTelescopicPose(cObj, topYC);
+cObj.position.z = holder.position.z - holder.userData.height * 0.175 - (topYC * Math.sin(thB) + topZ * Math.cos(thB)) + 0.01 * swayP;
+}
+cObj.userData.reachTopY = topYC;
+}
+if (cObj.userData.reachTopY !== undefined && cObj.userData.reachTopY !== topY) {
+topY = cObj.userData.reachTopY;
+setTelescopicPose(cObj, topY);
+cObj.position.z = holder.position.z - holder.userData.height * 0.175 - (topY * Math.sin(thB) + topZ * Math.cos(thB)) + 0.01 * swayP;
+}
+}
+spinWheels(cObj, spin);
+caseJobs.push({ cObj: cObj, holder: holder, armIdx: armIdx });
+};
+if (one) { // 担当者が2個とも引く（左右の手に1個ずつ）
+placeCase(caseAObj, carrierP, 0, laneOf(carrierP) - (layout.dimsA.W / 2 + 0.09));
+placeCase(caseBObj, carrierP, 1, laneOf(carrierP) + (layout.dimsB.W / 2 + 0.09));
+} else { // それぞれが自分のケースを外側の手で引く
+placeCase(caseAObj, personA, 1, laneOf(personA) + (layout.dimsA.W / 2 + 0.09));
+placeCase(caseBObj, personB, 0, laneOf(personB) - (layout.dimsB.W / 2 + 0.09));
+}
+stageGroup.updateMatrixWorld(true);
+caseJobs.forEach(({ cObj }) => { // 傾けた分を補正して車輪を接地させる。当たる点は回転する車輪のAABBでなく、ケースに固定された最下点候補（車輪中心−半径／ハウジング下角／胴体下角）で決める（回転で接地高さが揺れないように）
+const d = cObj.userData.dims, wr = cObj.userData.wheelR;
+const cand = [];
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+cand.push([new THREE.Vector3(sx * (d.W / 2 - 0.052), -d.H / 2 - WHEEL_DROP + wr, sz * (d.D / 2 - 0.052)), wr]);
+for (const tx of [-1, 1]) cand.push([new THREE.Vector3(sx * (d.W / 2 - 0.052) + tx * 0.03, -d.H / 2 - 0.024, sz * (d.D / 2 - 0.052) + tx * 0.03), 0]);
+cand.push([new THREE.Vector3(sx * d.W / 2, -d.H / 2, sz * d.D / 2), 0]);
+}
+cObj.updateMatrixWorld(true);
+let minY = Infinity;
+for (const [pt, sub] of cand) minY = Math.min(minY, pt.clone().applyMatrix4(cObj.matrixWorld).y - sub);
+cObj.position.y -= minY;
+});
+caseGroup.updateMatrixWorld(true);
+[personA, personB].forEach(person => {
+[0, 1].forEach(i => {
+const sg = i === 0 ? -1 : 1;
+const g = gaitLeg(t / 0.95 + i * 0.5, 0.204); // 支持60% : スイング40%。振幅は支持足の後退速度が地面のスクロール速度（0.716m/s）と一致する値（2*amp/(0.6*0.95)=0.716）＝フットスケート解消
+poseLegWorld(person, i, new THREE.Vector3(
+person.position.x + sg * person.userData.torsoW * 0.25,
+ANKLE_Y + g.lift * 0.06,
+0.30 + g.z));
+});
+});
+const errs = { A: 0, B: 0 };
+const heldArms = { A: new Set(), B: new Set() };
+caseJobs.forEach(({ cObj, holder, armIdx }) => {
+const gripW = cObj.localToWorld(cObj.userData.teleGripC.clone());
+poseArmWorld(holder, armIdx, gripW, new THREE.Vector3((armIdx === 0 ? -1 : 1) * 0.30, -0.10, -0.95)); // 肘の逃げを明示（下＋やや後ろ主体）。標準ポールだと腕が伸び切る位相で肘の向きが跳ぶため
+heldArms[holder.userData.role].add(armIdx);
+const e = limbTipWorld(holder, holder.arms[armIdx], gripW).distanceTo(gripW) * 1000;
+if (e > errs[holder.userData.role]) errs[holder.userData.role] = e;
+});
+[personA, personB].forEach(person => { // 空いた手は対側の脚と逆位相に、肩からの振り子で自然に振る
+[0, 1].forEach(i => {
+if (heldArms[person.userData.role].has(i)) return;
+const gz = gaitLeg(t / 0.95 + (i === 0 ? 0.5 : 0) - 0.045, 0.14).z; // 対側脚の前後位置に同期（位相は追従遅れぶん少し遅らせる）
+const target = freeHandTarget(person, i, gz, 0.14, 1);
+const yaw = person.bodyGroup.rotation.y, ca = Math.cos(-0.8 * yaw), sa = Math.sin(-0.8 * yaw);
+const ox = target.x - person.position.x, oz = target.z - person.position.z;
+target.x = person.position.x + ox * ca + oz * sa;
+target.z = person.position.z - ox * sa + oz * ca;
+poseArmWorld(person, i, target, new THREE.Vector3((i === 0 ? -1 : 1) * 0.30, -0.10, -0.95)); // 肘の逃げは外でなく下＋やや後ろ主体（外へ張り出させない）
+});
+});
+personA.updateMatrixWorld(true); personB.updateMatrixWorld(true);
+measure.mode = 'pull';
+measure.loadTilt = loadTiltP;
+measure.pattern = layout.pattern; measure.carrier = layout.carrier;
+measure.handErrPullAMm = errs.A;
+measure.handErrPullBMm = errs.B;
+measure.wheelSpin = caseAObj.userData.wheels[0].rotation.x;
+measure.pairCx = (personA.position.x + personB.position.x) / 2;
+measure.pullPos = layout.pullPos;
+measure.caseTiltA = caseAObj.rotation.x; measure.caseTiltB = caseBObj.rotation.x;
+caseGroup.updateMatrixWorld(true);
+const trueBottomY = cObj => { // 回転する車輪のAABB膨張を避けた実底（車輪以外はBox3、車輪は中心−半径）
+const b = new THREE.Box3(); const wps = cObj.userData.wheels;
+cObj.updateMatrixWorld(true);
+cObj.traverse(o => { if (o.isMesh && o.visible && !wps.includes(o)) { o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+let m = b.min.y; const wp = new THREE.Vector3();
+wps.forEach(w => { w.getWorldPosition(wp); m = Math.min(m, wp.y - cObj.userData.wheelR); });
+return m;
+};
+measure.caseMinYA = trueBottomY(caseAObj);
+measure.caseMinYB = trueBottomY(caseBObj);
+viewCenter.set(off, 0.85, 0);
+}
+
+function setAnimMode(mode) {
+checkRadio('anim', mode);
+const panelOpen = !document.getElementById('ui-panel').classList.contains('collapsed');
+if (mode === 'play' && panelOpen) { animPlaying = false; return; } // パネルが開いている間は予約扱い（絶対に始まらない）。閉じた時に開始する
+animPlaying = (mode === 'play');
+if (animPlaying) animClock.getDelta();
+}
+
+function animate() {
+requestAnimationFrame(animate);
+const dt = Math.min(animClock.getDelta(), 0.05);
+if (animPlaying) animTime += dt;
+if (layout) applyPose(animTime);
+const centerPos = viewCenter;
+if (currentView === '3rd') {
+camera.position.set(
+centerPos.x + Math.sin(rotation.y) * camDist * Math.cos(rotation.x),
+centerPos.y + Math.sin(rotation.x) * camDist,
+centerPos.z + Math.cos(rotation.y) * camDist * Math.cos(rotation.x)
+);
+camera.lookAt(centerPos);
+} else {
+const self = (currentView === 'A' ? personA : personB);
+// 一人称: カメラ位置は頭（headParts）のワールド位置（両目の間）、基本向きは頭のワールド向きから得た視線方向（顔の前方=ローカル+z）に一致させる
+self.headParts.updateWorldMatrix(true, false);
+const eyePos = self.headParts.localToWorld(new THREE.Vector3(0, self.userData.headH * 0.2, self.userData.headH * 0.55));
+camera.position.copy(eyePos);
+const headQ = self.headParts.getWorldQuaternion(new THREE.Quaternion());
+const gaze = new THREE.Vector3(0, 0, 1).applyQuaternion(headQ); // 視線方向（ワールド）
+const baseTargetRotation = new THREE.Quaternion().setFromEuler(
+new THREE.Euler(Math.asin(Math.max(-1, Math.min(1, gaze.y))), Math.atan2(-gaze.x, -gaze.z), 0, 'YXZ')
+); // 視線のヨー・ピッチだけを基本向きにする（ロールは持たせない）
+const operationRotation = new THREE.Quaternion().setFromEuler(
+new THREE.Euler(rotation.x, rotation.y, 0, 'YXZ')
+);
+camera.quaternion.copy(baseTargetRotation).multiply(operationRotation);
+camera.rotation.z = 0; // 一人称ロールは毎フレーム0に戻す (quaternion設定後にEulerへ反映されるため明示)
+}
+renderer.render(scene, camera);
+}
+function setupControls() {
+const c = document.getElementById('canvas-container');
+let initialPinchDist = null;
+const move = (dx, dy) => {
+rotation.y -= dx * 0.005; rotation.x -= dy * 0.005;
+rotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, rotation.x));
+};
+c.addEventListener('mousedown', () => isDragging = true);
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => { if (isDragging) move(e.movementX, e.movementY);});
+c.addEventListener('wheel', e => {
+if (currentView === '3rd') {
+camDist += e.deltaY * 0.002;
+camDist = Math.max(0.5, Math.min(10, camDist));
+}
+}, { passive: true});
+c.addEventListener('touchstart', e => {
+isDragging = true;
+if (e.touches.length === 1) { previousTouch = e.touches[0]; initialPinchDist = null;}
+else if (e.touches.length === 2) {
+initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+}
+}, { passive: false});
+window.addEventListener('touchend', () => { isDragging = false; initialPinchDist = null;});
+window.addEventListener('touchmove', e => {
+if (!isDragging) return;
+if (e.touches.length === 1 && previousTouch) {
+const touch = e.touches[0];
+move(touch.clientX - previousTouch.clientX, touch.clientY - previousTouch.clientY);
+previousTouch = touch;
+} else if (e.touches.length === 2 && initialPinchDist!== null && currentView === '3rd') {
+const currentDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+const diff = currentDist - initialPinchDist;
+camDist -= diff * 0.005;
+camDist = Math.max(0.5, Math.min(10, camDist));
+initialPinchDist = currentDist;
+}
+}, { passive: false});
+}
+
+function switchView() {
+const order = ['3rd', 'A', 'B'];
+currentView = order[(order.indexOf(currentView) + 1) % order.length];
+rotation.x = 0; rotation.y = 0;
+if (camera) { camera.fov = 50; camera.updateProjectionMatrix();}
+document.getElementById('crosshair').style.display = currentView === '3rd'? 'none': 'block';
+updateScene();
+}
+
+function shareToX() {
+const nA = document.getElementById('nameA').value || 'A', nB = document.getElementById('nameB').value || 'B';
+const hA = parseFloat(document.getElementById('heightA').value) || 158.0, hB = parseFloat(document.getElementById('heightB').value) || 171.5;
+const modeName = { 'stairs': '階段で持つ', 'pull': '引いて歩く'}[radioVal('mode', 'stairs')];
+const sizeNameOf = v => v === 'fit' ? '身の丈' : v;
+const sizeNameA = sizeNameOf(radioVal('sizeA', 'fit')), sizeNameB = sizeNameOf(radioVal('sizeB', 'fit'));
+const sizeName = sizeNameA === sizeNameB ? sizeNameA : `A:${sizeNameA}／B:${sizeNameB}`;
+const patName = radioVal('pattern', 'one') === 'one' ? (radioVal('carrier', 'B') === 'A' ? nA + 'が2個持ち' : nB + 'が2個持ち') : 'それぞれが持つ';
+window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${nA}(${hA.toFixed(1)}cm)と${nB}(${hB.toFixed(1)}cm)のキャリーケース体格差！（${modeName}・${patName}・${sizeName}）\n#キャリーケースシミュレーター\n${window.location.href}`)}`, '_blank');
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,2 +1,0 @@
-# carrycase-simulator
-キャリーケースシミュレーター
